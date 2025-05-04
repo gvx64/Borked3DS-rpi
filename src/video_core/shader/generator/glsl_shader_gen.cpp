@@ -182,17 +182,15 @@ std::string_view MakeLoadPrefix(AttribLoadFlags flag) {
 
 std::string GenerateVertexShader(const ShaderSetup& setup, const PicaVSConfig& config,
                                  bool separable_shader) {
-#ifndef __APPLE__
-    GLint majorVersion = 0, minorVersion = 0;
-    glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
-    glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
-#endif
-
     std::string out;
     if (separable_shader) {
         out += "#extension GL_ARB_separate_shader_objects : enable\n";
 
 #ifndef __APPLE__
+        GLint majorVersion = 0, minorVersion = 0;
+        glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
+        glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
+
         if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
             out += R"(
 #extension GL_ARB_separate_shader_objects : enable
@@ -210,50 +208,6 @@ layout(location = ATTRIBUTE_VIEW) out vec3 view;
 
     out += VSPicaUniformBlockDef;
     out += VSUniformBlockDef;
-
-#ifndef __APPLE__
-    if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
-        // Handle output attributes directly in vertex shader
-        out += GetVertexInterfaceDeclaration(true, config.state.use_clip_planes, separable_shader);
-
-        // Output attributes declaration
-        for (u32 i = 0; i < config.state.num_outputs; ++i) {
-            if (separable_shader) {
-                out += fmt::format("layout(location = {}) out ", i);
-            } else {
-                out += "out ";
-            }
-            out += fmt::format("vec4 vs_out_attr{};\n", i);
-        }
-
-        // Move geometry shader functionality into vertex shader
-        if (!config.state.use_geometry_shader) {
-            const auto semantic =
-                [&state = config.state](VSOutputAttributes::Semantic slot_semantic) -> std::string {
-                const u32 slot = static_cast<u32>(slot_semantic);
-                const u32 attrib = state.gs_state.semantic_maps[slot].attribute_index;
-                const u32 comp = state.gs_state.semantic_maps[slot].component_index;
-                if (attrib < state.gs_state.gs_output_attributes) {
-                    return fmt::format("vs_out_attr{}.{}", attrib, "xyzw"[comp]);
-                }
-                return "1.0";
-            };
-
-            // Handle quaternion and position calculations directly
-            out += "void ProcessVertex() {\n";
-            out += "    vec4 vtx_quaternion = vec4(" + semantic(VSOutputAttributes::QUATERNION_X) +
-                   ", " + semantic(VSOutputAttributes::QUATERNION_Y) + ", " +
-                   semantic(VSOutputAttributes::QUATERNION_Z) + ", " +
-                   semantic(VSOutputAttributes::QUATERNION_W) + ");\n";
-
-            out += "    gl_Position = vec4(" + semantic(VSOutputAttributes::POSITION_X) + ", " +
-                   semantic(VSOutputAttributes::POSITION_Y) + ", " +
-                   semantic(VSOutputAttributes::POSITION_Z) + ", " +
-                   semantic(VSOutputAttributes::POSITION_W) + ");\n";
-            out += "}\n\n";
-        }
-    }
-#endif
 
     std::array<bool, 16> used_regs{};
     const auto get_input_reg = [&used_regs](u32 reg) {

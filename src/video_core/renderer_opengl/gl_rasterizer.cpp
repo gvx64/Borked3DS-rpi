@@ -225,6 +225,22 @@ RasterizerOpenGL::RasterizerOpenGL(Memory::MemorySystem& memory, Pica::PicaCore&
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+            // Lighting LUT texture: 1024x2 for 8 LUTs, 256 elements each
+            glBindTexture(GL_TEXTURE_2D, texture_buffer_lut_rg.handle);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, 1024, 2, 0, GL_RG, GL_FLOAT, nullptr);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+            // Fog LUT texture: 128x1
+            glBindTexture(GL_TEXTURE_2D, texture_buffer_lut_lf.handle);  //gvx64
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, 128, 1, 0, GL_RG, GL_FLOAT, nullptr);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
             // Set flag for shader
             fs_uniform_block_data.data.use_texture2d_lut = 1;
             fs_uniform_block_data.dirty = true;

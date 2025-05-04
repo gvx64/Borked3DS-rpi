@@ -101,76 +101,55 @@ bool BlitHelper::ConvertDS24S8ToRGBA8(Surface& source, Surface& dest,
 
     const bool is_gles = driver.IsOpenGLES();
 
-    if (is_gles) {
-        // OpenGL ES path - use single texture
-        state.texture_units[0].texture_2d = source.Handle();
-        state.texture_units[0].sampler = 0;
-    } else {
-        // Desktop OpenGL path - use separate textures
-        state.texture_units[0].texture_2d = source.Handle();
-        state.texture_units[0].sampler = 0;
-        state.texture_units[1].sampler = 0;
-    }
+    // Bind depth-stencil source texture
+    state.texture_units[0].texture_2d = source.Handle();
+    state.texture_units[0].sampler = 0;
 
-    if (use_texture_view) {
-        temp_tex.Create();
-        glActiveTexture(GL_TEXTURE1);
-        if (is_gles) {
-            glTextureView(temp_tex.handle, GL_TEXTURE_2D, source.Handle(), GL_DEPTH24_STENCIL8_OES,
-                          0, 1, 0, 1);
-        } else {
-            glTextureView(temp_tex.handle, GL_TEXTURE_2D, source.Handle(), GL_DEPTH24_STENCIL8, 0,
-                          1, 0, 1);
-        }
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    } else if (copy.extent.width > temp_extent.width || copy.extent.height > temp_extent.height) {
-        temp_extent = copy.extent;
-        temp_tex.Release();
-        temp_tex.Create();
-        state.texture_units[1].texture_2d = temp_tex.handle;
-        state.Apply();
-        glActiveTexture(GL_TEXTURE1);
-        if (is_gles) {
-            glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH24_STENCIL8_OES, temp_extent.width,
-                           temp_extent.height);
-        } else {
+    if (is_gles) {
+        // OpenGL ES 3.1 does NOT support glTextureView. Use fallback path.
+        if (copy.extent.width > temp_extent.width || copy.extent.height > temp_extent.height) {
+            temp_extent = copy.extent;
+            temp_tex.Release();
+            temp_tex.Create();
+
+            state.texture_units[1].texture_2d = temp_tex.handle;
+            state.Apply();
+            glActiveTexture(GL_TEXTURE1);
+
+            // Allocate storage for temporary depth-stencil texture
             glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH24_STENCIL8, temp_extent.width,
                            temp_extent.height);
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         }
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    } else {
+        // Desktop OpenGL path with optional texture view
+        state.texture_units[1].sampler = 0;
+
+        if (use_texture_view) {
+            temp_tex.Create();
+            glActiveTexture(GL_TEXTURE1);
+            glTextureView(temp_tex.handle, GL_TEXTURE_2D, source.Handle(), GL_DEPTH24_STENCIL8,
+                          0, 1, 0, 1);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        } else if (copy.extent.width > temp_extent.width || copy.extent.height > temp_extent.height) {
+            temp_extent = copy.extent;
+            temp_tex.Release();
+            temp_tex.Create();
+
+            state.texture_units[1].texture_2d = temp_tex.handle;
+            state.Apply();
+            glActiveTexture(GL_TEXTURE1);
+
+            glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH24_STENCIL8, temp_extent.width,
+                           temp_extent.height);
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        }
     }
-
-    state.texture_units[1].texture_2d = temp_tex.handle;
-    state.Apply();
-
-    glActiveTexture(GL_TEXTURE1);
-    if (!use_texture_view) {
-        glCopyImageSubData(source.Handle(), GL_TEXTURE_2D, 0, copy.src_offset.x, copy.src_offset.y,
-                           0, temp_tex.handle, GL_TEXTURE_2D, 0, copy.src_offset.x,
-                           copy.src_offset.y, 0, copy.extent.width, copy.extent.height, 1);
-    }
-
-    // Only set depth stencil texture mode for desktop OpenGL
-    if (!is_gles) {
-        glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
-    }
-
-    const Common::Rectangle src_rect{copy.src_offset.x, copy.src_offset.y + copy.extent.height,
-                                     copy.src_offset.x + copy.extent.width, copy.src_offset.x};
-    const Common::Rectangle dst_rect{copy.dst_offset.x, copy.dst_offset.y + copy.extent.height,
-                                     copy.dst_offset.x + copy.extent.width, copy.dst_offset.x};
-    SetParams(d24s8_to_rgba8, source.RealExtent(), src_rect);
-    Draw(d24s8_to_rgba8, dest.Handle(), draw_fbo.handle, 0, dst_rect);
-
-    if (use_texture_view) {
-        temp_tex.Release();
-    }
-
-    // Restore the sampler handles
-    state.texture_units[0].sampler = linear_sampler.handle;
-    state.texture_units[1].sampler = linear_sampler.handle;
 
     return true;
 }

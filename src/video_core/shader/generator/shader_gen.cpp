@@ -45,21 +45,9 @@ void PicaGSConfigState::Init(const Pica::RegsInternal& regs, bool use_clip_plane
 
 void PicaVSConfigState::Init(const Pica::RegsInternal& regs, Pica::ShaderSetup& setup,
                              bool use_clip_planes_, bool use_geometry_shader_, bool accurate_mul_) {
-#ifndef __APPLE__
-    GLint majorVersion = 0, minorVersion = 0;
-    glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
-    glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
-
-    if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
-        use_geometry_shader = false;
-    } else {
-        use_geometry_shader = use_geometry_shader_;
-    }
-#else
-    use_geometry_shader = use_geometry_shader_;
-#endif
 
     use_clip_planes = use_clip_planes_;
+    use_geometry_shader = use_geometry_shader_;
     sanitize_mul = accurate_mul_;
 
     program_hash = setup.GetProgramCodeHash();

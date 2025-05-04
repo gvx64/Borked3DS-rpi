@@ -332,17 +332,47 @@ void TextureRuntime::ClearTexture(Surface& surface, const VideoCore::TextureClea
 bool TextureRuntime::CopyTextures(Surface& source, Surface& dest,
                                   std::span<const VideoCore::TextureCopy> copies) {
     const GLenum src_textarget = source.texture_type == VideoCore::TextureType::CubeMap
-                                     ? GL_TEXTURE_CUBE_MAP
+                                     ? GL_TEXTURE_CUBE_MAP_POSITIVE_X  // pick face as needed
                                      : GL_TEXTURE_2D;
-    const GLenum dest_textarget =
-        dest.texture_type == VideoCore::TextureType::CubeMap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D;
+    const GLenum dest_textarget = dest.texture_type == VideoCore::TextureType::CubeMap
+                                       ? GL_TEXTURE_CUBE_MAP_POSITIVE_X
+                                       : GL_TEXTURE_2D;
+
+    GLuint src_fbo = 0, dst_fbo = 0;
+    glGenFramebuffers(1, &src_fbo);
+    glGenFramebuffers(1, &dst_fbo);
 
     for (const auto& copy : copies) {
-        glCopyImageSubData(source.Handle(), src_textarget, copy.src_level, copy.src_offset.x,
-                           copy.src_offset.y, copy.src_layer, dest.Handle(), dest_textarget,
-                           copy.dst_level, copy.dst_offset.x, copy.dst_offset.y, copy.dst_layer,
-                           copy.extent.width, copy.extent.height, 1);
+        // Bind source texture to src FBO
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, src_fbo);
+        glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                               src_textarget + copy.src_layer, source.Handle(), copy.src_level);
+
+        // Bind destination texture to dst FBO
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dst_fbo);
+        glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                               dest_textarget + copy.dst_layer, dest.Handle(), copy.dst_level);
+
+        // Set the read/draw buffers (required in desktop OpenGL, but not in GLES)
+        // glReadBuffer(GL_COLOR_ATTACHMENT0);
+        // glDrawBuffer(GL_COLOR_ATTACHMENT0);
+
+        // Perform the blit
+        glBlitFramebuffer(copy.src_offset.x, copy.src_offset.y,
+                          copy.src_offset.x + copy.extent.width,
+                          copy.src_offset.y + copy.extent.height,
+                          copy.dst_offset.x, copy.dst_offset.y,
+                          copy.dst_offset.x + copy.extent.width,
+                          copy.dst_offset.y + copy.extent.height,
+                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
     }
+
+    // Clean up
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glDeleteFramebuffers(1, &src_fbo);
+    glDeleteFramebuffers(1, &dst_fbo);
+
     return true;
 }
 

@@ -1,3 +1,28 @@
+GVX64 - Borked3DS-rpi
+
+This is a fork of rtiangha's Borked3DS which patches the opengles-dev-v2 branch
+for better functionality on the Raspberry Pi 4 & 5.  Note that this build
+requires the use of he OpenGL Graphics API (with GLES extensions enabled).
+The vulkan renderer on this build is not functional.
+
+Instructions for Building from Source:
+
+1. cd /home/pi
+
+2. sudo mkdir ./Borked3DS-rpi; cd ./Borked3DS-rpi
+
+3. sudo git clone https://github.com/gvx64/Borked3DS-rpi.git opengles-dev-v2
+
+3. cd ./opengles-dev-v2
+
+4. sudo git submodule update --init --recursive
+
+5. sudo mkdir ./Build ; cd ./Build
+
+6. sudo cmake .. (note minimum cmake 3.12)
+
+7. sudo make -j4
+
 <h1 align="center">
   <br>
   <a href="[https://github.com/Borked3DS]"><img src="https://github.com/user-attachments/assets/7fd0ed50-1e1f-4b0a-ba31-a524737705c5" alt="Borked3DS" width="200"></a>
