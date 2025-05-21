@@ -131,6 +131,9 @@ GLuint LoadShader(std::string_view source, GLenum type) {
         case GL_VERTEX_SHADER:
             debug_type = "vertex";
             break;
+        case GL_GEOMETRY_SHADER_EXT:
+            debug_type = "geometry";
+            break;
         case GL_FRAGMENT_SHADER:
             debug_type = "fragment";
             break;

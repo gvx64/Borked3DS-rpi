@@ -277,56 +277,29 @@ public:
             }
             pipeline.Create();
         }
-
-        if (is_gles) {
-            profile = Pica::Shader::Profile{
-                .has_separable_shaders = separable,
-                .has_clip_planes = driver.HasClipCullDistance(),
-                .has_geometry_shader = false,
-                .has_custom_border_color = (GLAD_GL_EXT_texture_border_clamp != 0),
-                .has_fragment_shader_interlock = driver.HasArbFragmentShaderInterlock(),
-                // TODO: This extension requires GLSL 450 / OpenGL 4.5 context.
-                .has_fragment_shader_barycentric = false,
-                .has_blend_minmax_factor = driver.HasBlendMinMaxFactor(),
-                .has_minus_one_to_one_range = true,
-                .has_logic_op = !driver.IsOpenGLES(),
-                .has_gl_ext_framebuffer_fetch = driver.HasExtFramebufferFetch(),
-                .has_gl_ext_texture_buffer = driver.HasExtTextureBuffer(),
-                .has_gl_arm_framebuffer_fetch = driver.HasArmShaderFramebufferFetch(),
-                .has_gl_arb_shader_image_load_store =
-                    !is_gles && driver.HasArbShaderImageLoadStore(),
-                .has_gl_nv_fragment_shader_interlock = driver.HasNvFragmentShaderInterlock(),
-                .has_gl_intel_fragment_shader_ordering =
-                    !is_gles && driver.HasIntelFragmentShaderOrdering(),
-                // TODO: This extension requires GLSL 450 / OpenGL 4.5 context.
-                .has_gl_nv_fragment_shader_barycentric = false,
-                .is_vulkan = false,
-            };
-        } else {
-            profile = Pica::Shader::Profile{
-                .has_separable_shaders = separable,
-                .has_clip_planes = driver.HasClipCullDistance(),
-                .has_geometry_shader = true,
-                .has_custom_border_color = (GLAD_GL_EXT_texture_border_clamp != 0),
-                .has_fragment_shader_interlock = driver.HasArbFragmentShaderInterlock(),
-                // TODO: This extension requires GLSL 450 / OpenGL 4.5 context.
-                .has_fragment_shader_barycentric = false,
-                .has_blend_minmax_factor = driver.HasBlendMinMaxFactor(),
-                .has_minus_one_to_one_range = true,
-                .has_logic_op = !driver.IsOpenGLES(),
-                .has_gl_ext_framebuffer_fetch = driver.HasExtFramebufferFetch(),
-                .has_gl_ext_texture_buffer = driver.HasExtTextureBuffer(),
-                .has_gl_arm_framebuffer_fetch = driver.HasArmShaderFramebufferFetch(),
-                .has_gl_arb_shader_image_load_store =
-                    !is_gles && driver.HasArbShaderImageLoadStore(),
-                .has_gl_nv_fragment_shader_interlock = driver.HasNvFragmentShaderInterlock(),
-                .has_gl_intel_fragment_shader_ordering =
-                    !is_gles && driver.HasIntelFragmentShaderOrdering(),
-                // TODO: This extension requires GLSL 450 / OpenGL 4.5 context.
-                .has_gl_nv_fragment_shader_barycentric = false,
-                .is_vulkan = false,
-            };
-        }
+        profile = Pica::Shader::Profile{
+            .has_separable_shaders = separable,
+            .has_clip_planes = driver.HasClipCullDistance(),
+            .has_geometry_shader = true,
+            .has_custom_border_color =
+                !is_gles || driver.HasExtension("GL_EXT_texture_border_clamp"),
+            .has_fragment_shader_interlock = driver.HasArbFragmentShaderInterlock(),
+            // TODO: This extension requires GLSL 450 / OpenGL 4.5 context.
+            .has_fragment_shader_barycentric = false,
+            .has_blend_minmax_factor = driver.HasBlendMinMaxFactor(),
+            .has_minus_one_to_one_range = true,
+            .has_logic_op = !driver.IsOpenGLES(),
+            .has_gl_ext_framebuffer_fetch = driver.HasExtFramebufferFetch(),
+            .has_gl_ext_texture_buffer = driver.HasExtTextureBuffer(),
+            .has_gl_arm_framebuffer_fetch = driver.HasArmShaderFramebufferFetch(),
+            .has_gl_arb_shader_image_load_store = !is_gles && driver.HasArbShaderImageLoadStore(),
+            .has_gl_nv_fragment_shader_interlock = driver.HasNvFragmentShaderInterlock(),
+            .has_gl_intel_fragment_shader_ordering =
+                !is_gles && driver.HasIntelFragmentShaderOrdering(),
+            // TODO: This extension requires GLSL 450 / OpenGL 4.5 context.
+            .has_gl_nv_fragment_shader_barycentric = false,
+            .is_vulkan = false,
+        };
     }
 
     struct ShaderTuple {
@@ -415,15 +388,10 @@ void ShaderProgramManager::UseTrivialVertexShader() {
 }
 
 void ShaderProgramManager::UseFixedGeometryShader(const Pica::RegsInternal& regs) {
-    if (driver.IsOpenGLES()) {
-        impl->current.gs = 0;
-        impl->current.gs_hash = 0;
-    } else {
-        PicaFixedGSConfig gs_config(regs, driver.HasClipCullDistance());
-        auto [handle, _] = impl->fixed_geometry_shaders.Get(gs_config, impl->separable);
-        impl->current.gs = handle;
-        impl->current.gs_hash = gs_config.Hash();
-    }
+    PicaFixedGSConfig gs_config(regs, driver.HasClipCullDistance());
+    auto [handle, _] = impl->fixed_geometry_shaders.Get(gs_config, impl->separable);
+    impl->current.gs = handle;
+    impl->current.gs_hash = gs_config.Hash();
 }
 
 void ShaderProgramManager::UseTrivialGeometryShader() {
@@ -450,9 +418,10 @@ void ShaderProgramManager::UseFragmentShader(const Pica::RegsInternal& regs,
 void ShaderProgramManager::ApplyTo(OpenGLState& state, bool accurate_mul) {
     if (impl->separable) {
         if (driver.HasBug(DriverBug::ShaderStageChangeFreeze)) {
-            if (driver.IsOpenGLES()) {
-                glUseProgramStages(impl->pipeline.handle,
-                                   GL_VERTEX_SHADER_BIT | GL_FRAGMENT_SHADER_BIT, 0);
+            if (Settings::values.use_gles.GetValue()) {
+                glUseProgramStagesEXT(
+                    impl->pipeline.handle,
+                    GL_VERTEX_SHADER_BIT | GL_GEOMETRY_SHADER_BIT_EXT | GL_FRAGMENT_SHADER_BIT, 0);
             } else {
                 glUseProgramStages(
                     impl->pipeline.handle,
@@ -460,15 +429,17 @@ void ShaderProgramManager::ApplyTo(OpenGLState& state, bool accurate_mul) {
             }
         }
 
-        if (driver.IsOpenGLES()) {
-            glUseProgramStages(impl->pipeline.handle, GL_VERTEX_SHADER_BIT, impl->current.vs);
-            glUseProgramStages(impl->pipeline.handle, GL_FRAGMENT_SHADER_BIT, impl->current.fs);
+
+        if (Settings::values.use_gles.GetValue()) {
+            glUseProgramStagesEXT(impl->pipeline.handle, GL_VERTEX_SHADER_BIT, impl->current.vs);
+            glUseProgramStagesEXT(impl->pipeline.handle, GL_GEOMETRY_SHADER_BIT_EXT,
+                                  impl->current.gs);
+            glUseProgramStagesEXT(impl->pipeline.handle, GL_FRAGMENT_SHADER_BIT, impl->current.fs);
         } else {
             glUseProgramStages(impl->pipeline.handle, GL_VERTEX_SHADER_BIT, impl->current.vs);
             glUseProgramStages(impl->pipeline.handle, GL_GEOMETRY_SHADER_BIT, impl->current.gs);
             glUseProgramStages(impl->pipeline.handle, GL_FRAGMENT_SHADER_BIT, impl->current.fs);
         }
-
         state.draw.shader_program = 0;
         state.draw.program_pipeline = impl->pipeline.handle;
     } else {

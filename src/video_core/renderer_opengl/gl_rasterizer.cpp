@@ -127,8 +127,16 @@ RasterizerOpenGL::RasterizerOpenGL(Memory::MemorySystem& memory, Pica::PicaCore&
     state.clip_distance[0] = true;
 
     // Generate VAO
-    sw_vao.Create();
-    hw_vao.Create();
+//gvx64    sw_vao.Create();
+//gvx64    hw_vao.Create();
+    if (OpenGL::g_use_vao){ // gvx64 only use vao in qt5 binary
+        sw_vao.Create(); //gvx64
+        hw_vao.Create(); //gxv64
+    } else { //gvx64
+        // In CLI mode we will skip vao creation due to multiple competing vao context issues on Raspberry Pi
+        // We will use glVertexAttribPointer directly instead
+    } //gvx64
+
 
     glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &uniform_buffer_alignment);
     uniform_size_aligned_vs_pica =
@@ -143,7 +151,7 @@ RasterizerOpenGL::RasterizerOpenGL(Memory::MemorySystem& memory, Pica::PicaCore&
     state.draw.vertex_buffer = vertex_buffer.GetHandle();
     state.Apply();
 
-    glVertexAttribPointer(ATTRIBUTE_POSITION, 4, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
+/*    glVertexAttribPointer(ATTRIBUTE_POSITION, 4, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
                           (GLvoid*)offsetof(HardwareVertex, position));
     glEnableVertexAttribArray(ATTRIBUTE_POSITION);
 
@@ -171,7 +179,8 @@ RasterizerOpenGL::RasterizerOpenGL(Memory::MemorySystem& memory, Pica::PicaCore&
 
     glVertexAttribPointer(ATTRIBUTE_VIEW, 3, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
                           (GLvoid*)offsetof(HardwareVertex, view));
-    glEnableVertexAttribArray(ATTRIBUTE_VIEW);
+    glEnableVertexAttribArray(ATTRIBUTE_VIEW);*/
+    SetupHardwareVertexAttribPointers(); //gvx64
 
     // Allocate and bind texture buffer lut textures
     texture_buffer_lut_lf.Create();
@@ -234,7 +243,7 @@ RasterizerOpenGL::RasterizerOpenGL(Memory::MemorySystem& memory, Pica::PicaCore&
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
             // Fog LUT texture: 128x1
-            glBindTexture(GL_TEXTURE_2D, texture_buffer_lut_lf.handle);  //gvx64
+            glBindTexture(GL_TEXTURE_2D, texture_buffer_lut_lf.handle);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, 128, 1, 0, GL_RG, GL_FLOAT, nullptr);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -261,6 +270,7 @@ RasterizerOpenGL::RasterizerOpenGL(Memory::MemorySystem& memory, Pica::PicaCore&
     glEnable(GL_BLEND);
 
     SyncEntireState();
+    OpenGLState::rasterizer_ptr = this; //gvx64 - added to provide access to SetupHardwareVertexAttribPointers() in gl_state.cpp
 }
 
 RasterizerOpenGL::~RasterizerOpenGL() = default;
@@ -288,8 +298,51 @@ void RasterizerOpenGL::SyncFixedState() {
     SyncDepthWriteMask();
 }
 
+void RasterizerOpenGL::SetupHardwareVertexAttribPointers() {
+    glVertexAttribPointer(ATTRIBUTE_POSITION, 4, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
+                          (GLvoid*)offsetof(HardwareVertex, position));
+    glEnableVertexAttribArray(ATTRIBUTE_POSITION);
+
+    glVertexAttribPointer(ATTRIBUTE_COLOR, 4, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
+                          (GLvoid*)offsetof(HardwareVertex, color));
+    glEnableVertexAttribArray(ATTRIBUTE_COLOR);
+
+    glVertexAttribPointer(ATTRIBUTE_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
+                          (GLvoid*)offsetof(HardwareVertex, tex_coord0));
+    glEnableVertexAttribArray(ATTRIBUTE_TEXCOORD0);
+
+    glVertexAttribPointer(ATTRIBUTE_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
+                          (GLvoid*)offsetof(HardwareVertex, tex_coord1));
+    glEnableVertexAttribArray(ATTRIBUTE_TEXCOORD1);
+
+    glVertexAttribPointer(ATTRIBUTE_TEXCOORD2, 2, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
+                          (GLvoid*)offsetof(HardwareVertex, tex_coord2));
+    glEnableVertexAttribArray(ATTRIBUTE_TEXCOORD2);
+
+    glVertexAttribPointer(ATTRIBUTE_TEXCOORD0_W, 1, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
+                          (GLvoid*)offsetof(HardwareVertex, tex_coord0_w));
+    glEnableVertexAttribArray(ATTRIBUTE_TEXCOORD0_W);
+
+    glVertexAttribPointer(ATTRIBUTE_NORMQUAT, 4, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
+                          (GLvoid*)offsetof(HardwareVertex, normquat));
+    glEnableVertexAttribArray(ATTRIBUTE_NORMQUAT);
+
+    glVertexAttribPointer(ATTRIBUTE_VIEW, 3, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
+                          (GLvoid*)offsetof(HardwareVertex, view));
+    glEnableVertexAttribArray(ATTRIBUTE_VIEW);
+}
+
 void RasterizerOpenGL::SetupVertexArray(u8* array_ptr, GLintptr buffer_offset,
                                         GLuint vs_input_index_min, GLuint vs_input_index_max) {
+    GLint majorVersion = 0, minorVersion = 0; //gvx64
+    glGetIntegerv(GL_MAJOR_VERSION, &majorVersion); //gvx64
+    glGetIntegerv(GL_MINOR_VERSION, &minorVersion); //gvx64
+    if (OpenGL::g_use_vao) { //gvx64
+        // CLI mode -  fallback path - no VAO usage to avoid competing vao context issues on raspberry pi
+        glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer.GetHandle()); //gvx64
+        SetupHardwareVertexAttribPointers(); //gvx64
+        return; //gvx64
+    } //gvx64
     BORKED3DS_PROFILE("OpenGL", "Vertex Array Setup");
     const auto& vertex_attributes = regs.pipeline.vertex_attributes;
     PAddr base_address = vertex_attributes.GetPhysicalBaseAddress();
@@ -377,11 +430,11 @@ bool RasterizerOpenGL::SetupGeometryShader() {
     glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
     glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
 
-    if (OpenGL::GLES && majorVersion == 3 && minorVersion < 2) {
-        LOG_DEBUG(Render_OpenGL,
-                  "Accelerate draw under OpenGLES < 3.2 doesn't support geometry shader");
-        return false;
-    }
+//gvx64    if (OpenGL::GLES && majorVersion == 3 && minorVersion < 2) {
+//gvx64        LOG_DEBUG(Render_OpenGL,
+//gvx64                  "Accelerate draw under OpenGLES < 3.2 doesn't support geometry shader");
+//gvx64        return false;
+//gvx64    }
 
     if (regs.pipeline.use_gs != Pica::PipelineRegs::UseGS::No) {
         LOG_ERROR(Render_OpenGL, "Accelerate draw doesn't support geometry shader");
@@ -422,6 +475,7 @@ bool RasterizerOpenGL::AccelerateDrawBatch(bool is_indexed) {
 }
 
 bool RasterizerOpenGL::AccelerateDrawBatchInternal(bool is_indexed) {
+printf("../src/video_core/renderer_opengl/gl_rasterizer.cpp, RasterizerOpenGL::AccelerateDrawBatchInternal(bool is_indexed) - beginning \n");//gvx64
     const GLenum primitive_mode = MakePrimitiveMode(regs.pipeline.triangle_topology);
     auto [vs_input_index_min, vs_input_index_max, vs_input_size] = AnalyzeVertexArray(is_indexed);
 
@@ -448,7 +502,7 @@ bool RasterizerOpenGL::AccelerateDrawBatchInternal(bool is_indexed) {
     shader_manager.ApplyTo(state, accurate_mul);
     state.Apply();
 
-    if (is_indexed) {
+/*    if (is_indexed) {
         bool index_u16 = regs.pipeline.index_array.format != 0;
         std::size_t index_buffer_size = regs.pipeline.num_vertices * (index_u16 ? 2 : 1);
         if (index_buffer_size > INDEX_BUFFER_SIZE) {
@@ -521,7 +575,64 @@ bool RasterizerOpenGL::AccelerateDrawBatchInternal(bool is_indexed) {
                                           reinterpret_cast<const void*>(buffer_offset),
                                           -static_cast<GLint>(vs_input_index_min));
         }
+    } */
+if (is_indexed) { //gvx64 begin
+    bool index_u16 = regs.pipeline.index_array.format != 0;
+    std::size_t index_buffer_size = regs.pipeline.num_vertices * (index_u16 ? 2 : 1);
+    if (index_buffer_size > INDEX_BUFFER_SIZE) {
+        LOG_WARNING(Render_OpenGL, "Too large index input size {}", index_buffer_size);
+        return false;
+    }
+
+    const u8* index_data =
+        memory.GetPhysicalPointer(regs.pipeline.vertex_attributes.GetPhysicalBaseAddress() +
+                                  regs.pipeline.index_array.offset);
+    if (index_u16) {
+        const u16* indices = reinterpret_cast<const u16*>(index_data);
+        u16 min_idx = *std::min_element(indices, indices + regs.pipeline.num_vertices);
+        u16 max_idx = *std::max_element(indices, indices + regs.pipeline.num_vertices);
+        LOG_DEBUG(Render_OpenGL, "Index range: {} to {}, vs_input_index_min: {}", min_idx,
+                  max_idx, vs_input_index_min);
+    }
+
+    // Upload index data using glBufferSubData instead of glMapBufferRange
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer.GetHandle());
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, index_buffer_size, index_data);
+
+    if (vs_input_index_min < 0 || vs_input_index_min > vs_input_index_max) {
+        LOG_ERROR(Render_OpenGL, "Invalid vertex index range");
+        return false;
+    }
+
+    GLenum type = index_u16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_BYTE;
+    const void* indices = reinterpret_cast<const void*>(0); // offset into the buffer
+
+    if ((is_gles && majorVersion == 3 && minorVersion < 2) ||
+        !GLAD_GL_OES_draw_elements_base_vertex) {
+        // Adjust index values manually
+        std::vector<u8> adjusted_indices(index_buffer_size);
+        if (index_u16) {
+            const u16* src = reinterpret_cast<const u16*>(index_data);
+            u16* dst = reinterpret_cast<u16*>(adjusted_indices.data());
+            for (size_t i = 0; i < regs.pipeline.num_vertices; ++i) {
+                dst[i] = src[i] - vs_input_index_min;
+            }
+        } else {
+            const u8* src = index_data;
+            u8* dst = adjusted_indices.data();
+            for (size_t i = 0; i < regs.pipeline.num_vertices; ++i) {
+                dst[i] = src[i] - vs_input_index_min;
+            }
+        }
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, index_buffer_size, adjusted_indices.data());
+        glDrawElements(primitive_mode, regs.pipeline.num_vertices, type, indices);
     } else {
+        glDrawRangeElementsBaseVertex(primitive_mode, vs_input_index_min, vs_input_index_max,
+                                      regs.pipeline.num_vertices, type, indices,
+                                      -static_cast<GLint>(vs_input_index_min));
+    }
+} //gvx64 end
+    else {
         glDrawArrays(primitive_mode, 0, regs.pipeline.num_vertices);
     }
     GLenum error = glGetError();

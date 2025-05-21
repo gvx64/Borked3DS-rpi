@@ -10,6 +10,9 @@
 
 namespace OpenGL {
 
+class RasterizerOpenGL; //gvx64 - make SetupHardwareVertexAttribPointers() (located in gl_rasterizer.cpp) accessible in gl_state.cpp
+extern bool g_use_vao; //gvx64 - Global flag for VAO usage
+
 namespace TextureUnits {
 
 struct TextureUnit {
@@ -186,6 +189,8 @@ public:
     OpenGLState& ResetVertexArray(GLuint handle);
     OpenGLState& ResetFramebuffer(GLuint handle);
     OpenGLState& ResetRenderbuffer(GLuint handle);
+
+    static RasterizerOpenGL* rasterizer_ptr;  //gvx64 - make SetupHardwareVertexAttribPointers() (located in gl_rasterizer.cpp) accessible in gl_state.cpp
 
 private:
     static OpenGLState cur_state;

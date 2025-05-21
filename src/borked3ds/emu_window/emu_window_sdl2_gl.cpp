@@ -16,6 +16,8 @@
 #include "video_core/gpu.h"
 #include "video_core/renderer_base.h"
 
+#include <glad/gl.h>
+
 class SDLGLContext : public Frontend::GraphicsContext {
 public:
     using SDL_GLContext = void*;
@@ -47,7 +49,7 @@ private:
 static SDL_Window* CreateGLWindow(const std::string& window_title, bool gles) {
     if (gles) {
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     } else {
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
@@ -77,15 +79,18 @@ EmuWindow_SDL2_GL::EmuWindow_SDL2_GL(Core::System& system_, bool fullscreen, boo
     if (Settings::values.renderer_debug) {
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
     }
-
     std::string window_title = fmt::format("Borked3DS {} | {}-{}", Common::g_build_fullname,
                                            Common::g_scm_branch, Common::g_scm_desc);
 
+    bool use_gles = true;//= (glGetString(GL_VERSION) && strstr((const char*)glGetString(GL_VERSION), "OpenGL ES")); //gvx64
+
     // First, try to create a context with the requested type.
-    render_window = CreateGLWindow(window_title, Settings::values.use_gles.GetValue());
+//gvx64    render_window = CreateGLWindow(window_title, Settings::values.use_gles.GetValue());
+    render_window = CreateGLWindow(window_title, use_gles); //gvx64
     if (render_window == nullptr) {
         // On failure, fall back to context with flipped type.
-        render_window = CreateGLWindow(window_title, !Settings::values.use_gles.GetValue());
+//gvx64        render_window = CreateGLWindow(window_title, !Settings::values.use_gles.GetValue());
+        render_window = CreateGLWindow(window_title, !use_gles); //gxv64
         if (render_window == nullptr) {
             LOG_CRITICAL(Frontend, "Failed to create SDL2 window: {}", SDL_GetError());
             exit(1);

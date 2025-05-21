@@ -11,10 +11,14 @@
 #include "video_core/renderer_opengl/gl_driver.h"
 #include "video_core/renderer_opengl/gl_state.h"
 #include "video_core/renderer_opengl/gl_vars.h"
+#include "video_core/renderer_opengl/gl_rasterizer.h"  //gvx64 - for RasterizerOpenGL
 
 namespace OpenGL {
 
 OpenGLState OpenGLState::cur_state;
+
+RasterizerOpenGL* OpenGLState::rasterizer_ptr = nullptr; //gvx64 add visibility to SetupHardwareVertexAttribPointers() in gl_state.cpp for vao workaround for raspberry pi cli mode.
+bool g_use_vao = true; //gvx64 - Default: use VAOs (for GUI mode)
 
 OpenGLState::OpenGLState() {
     // These all match default OpenGL values
@@ -324,13 +328,40 @@ void OpenGLState::Apply() const {
     }
 
     // Vertex array
-    if (draw.vertex_array != cur_state.draw.vertex_array) {
+/*    if (draw.vertex_array != cur_state.draw.vertex_array) {
         if (GLES && majorVersion == 3 && minorVersion < 2) {
+            while (glGetError() != 0 ) //gvx64
+                continue; //flush the glGetError stack - gvx64
             glBindVertexArrayOES(draw.vertex_array);
+            unsigned int error = glGetError(); //gvx64
+            if ( error != 0 )  //gvx64
+            { //gvx64
+                printf("../src/video_core/renderer_opengl/gl_state.cpp, Apply(),  glBindVertexArrayOES(draw.vertex_array);, error code = %x\n",error); //gvx64
+                LOG_ERROR(Render_OpenGL, "failed to bind vao, error code {:x}",error); //gvx64
+            } //gvx64
+            else //gvx64
+            { //gvx64
+                printf("../src/video_core/renderer_opengl/gl_state.cpp, Apply(),  glBindVertexArrayOES - SUCCESSFUL!!\n"); //gvx64
+            } //gvx64
         } else {
             glBindVertexArray(draw.vertex_array);
         }
-    }
+    }*/
+    if (draw.vertex_array != cur_state.draw.vertex_array) { //gvx64
+        if (OpenGL::g_use_vao) { //gvx64 - if running qt5 binary (g_use_vao flag only set false in main() of cli binary)
+            if (!OpenGL::GLES || (majorVersion >= 3 && minorVersion >= 2)) { //gvx64
+                glBindVertexArray(draw.vertex_array); //gvx64
+            }else{ //gvx64 - if running OpenGL ES 3.1 but using the QT5 binary
+                glBindVertexArrayOES(draw.vertex_array); //gvx64 - no competing vao context, so this should work
+            } //gvx64
+        } else { //gvx64 - if running the cli binary, avoid vao's due to competing context issues
+            if (rasterizer_ptr) { //gvx64 - It’s safe to assume rasterizer_ptr is valid in Apply() only after a rasterizer has been created
+                rasterizer_ptr->SetupHardwareVertexAttribPointers(); //gvx64 - alternative to vao
+            }else{ //gvx64
+                LOG_ERROR(Render_OpenGL, "failed to initialize rasterizer_ptr"); //gvx64
+            } //gvx64
+        }//gvx64
+    }//gvx64
 
     // Vertex buffer
     if (draw.vertex_buffer != cur_state.draw.vertex_buffer) {

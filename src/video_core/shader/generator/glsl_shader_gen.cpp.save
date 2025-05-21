@@ -100,83 +100,6 @@ static std::string GetVertexInterfaceDeclaration(bool is_output, bool use_clip_p
     return out;
 }
 
-/*std::string GenerateTrivialVertexShader(bool use_clip_planes, bool separable_shader) {
-    std::string out;
-
-    // Always declare version on first line
-    out += "#version 310 es\n";
-
-    // Conditionally enable useful extensions
-    out += R"(
-#if defined(GL_EXT_clip_cull_distance)
-#extension GL_EXT_clip_cull_distance : enable
-#endif
-)";
-
-    // Uniforms
-    out += VSUniformBlockDef;
-
-    // Input attributes
-    out += fmt::format(R"(
-layout(location = {}) in vec4 vert_position;
-layout(location = {}) in vec4 vert_color;
-layout(location = {}) in vec2 vert_texcoord0;
-layout(location = {}) in vec2 vert_texcoord1;
-layout(location = {}) in vec2 vert_texcoord2;
-layout(location = {}) in float vert_texcoord0_w;
-layout(location = {}) in vec4 vert_normquat;
-layout(location = {}) in vec3 vert_view;
-)",
-        ATTRIBUTE_POSITION, ATTRIBUTE_COLOR, ATTRIBUTE_TEXCOORD0, ATTRIBUTE_TEXCOORD1,
-        ATTRIBUTE_TEXCOORD2, ATTRIBUTE_TEXCOORD0_W, ATTRIBUTE_NORMQUAT, ATTRIBUTE_VIEW);
-
-    // Output declarations from helper
-    out += GetVertexInterfaceDeclaration(true, use_clip_planes, separable_shader);
-
-    // Helper: sanitize position
-    out += R"(
-const vec2 EPSILON_Z = vec2(0.000001f, -1.00001f);
-
-vec4 SanitizeVertex(vec4 vtx_pos) {
-    float ndc_z = vtx_pos.z / vtx_pos.w;
-    if (ndc_z > 0.0 && ndc_z < EPSILON_Z.x)
-        vtx_pos.z = 0.0;
-    if (ndc_z < -1.0 && ndc_z > EPSILON_Z.y)
-        vtx_pos.z = -vtx_pos.w;
-    return vtx_pos;
-}
-)";
-
-    // Main function
-    out += R"(
-void main() {
-    primary_color = vert_color;
-    texcoord0 = vert_texcoord0;
-    texcoord1 = vert_texcoord1;
-    texcoord2 = vert_texcoord2;
-    texcoord0_w = vert_texcoord0_w;
-    normquat = vert_normquat;
-    view = vert_view;
-
-    vec4 vtx_pos = SanitizeVertex(vert_position);
-    gl_Position = vec4(vtx_pos.x, vtx_pos.y, -vtx_pos.z, vtx_pos.w);
-)";
-
-    if (use_clip_planes) {
-        out += R"(
-    gl_ClipDistance[0] = -vtx_pos.z;
-    if (enable_clip1) {
-        gl_ClipDistance[1] = dot(clip_coef, vtx_pos);
-    } else {
-        gl_ClipDistance[1] = 0.0;
-    }
-)";
-    }
-
-    out += "\n}\n";
-    return out;
-}*/
-
 std::string GenerateTrivialVertexShader(bool use_clip_planes, bool separable_shader) {
     std::string out;
 
@@ -190,10 +113,10 @@ std::string GenerateTrivialVertexShader(bool use_clip_planes, bool separable_sha
 
         if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
             out += R"(
-#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_separate_shader_objects : enable  
 layout(location = ATTRIBUTE_COLOR) out vec4 primary_color;
 layout(location = ATTRIBUTE_TEXCOORD0) out vec2 texcoord0;
-layout(location = ATTRIBUTE_TEXCOORD1) out vec2 texcoord1;
+layout(location = ATTRIBUTE_TEXCOORD1) out vec2 texcoord1; 
 layout(location = ATTRIBUTE_TEXCOORD2) out vec2 texcoord2;
 layout(location = ATTRIBUTE_TEXCOORD0_W) out float texcoord0_w;
 layout(location = ATTRIBUTE_NORMQUAT) out vec4 normquat;
@@ -257,45 +180,28 @@ std::string_view MakeLoadPrefix(AttribLoadFlags flag) {
     return "";
 }
 
-/*std::string GenerateVertexShader(const ShaderSetup& setup, const PicaVSConfig& config, bool separable_shader) {
+std::string GenerateVertexShader(const ShaderSetup& setup, const PicaVSConfig& config,
+                                 bool separable_shader) {
     std::string out;
 
-    // Always emit #version as the very first line
+    // Always declare version on the first line
     out += "#version 310 es\n";
 
-    // Emit supported extensions
+    // Enable useful extensions conditionally
     out += R"(
-#if defined(GL_EXT_geometry_shader)
-#extension GL_EXT_geometry_shader : enable
-#endif
-#if defined(GL_EXT_texture_buffer)
-#extension GL_EXT_texture_buffer : enable
-#endif
-#if defined(GL_EXT_texture_storage)
-#extension GL_EXT_texture_storage : enable
-#endif
-#if defined(GL_EXT_separate_shader_objects)
-#extension GL_EXT_separate_shader_objects : enable
-#endif
 #if defined(GL_EXT_clip_cull_distance)
 #extension GL_EXT_clip_cull_distance : enable
-#endif
-#if defined(GL_EXT_texture_shadow_lod)
-#extension GL_EXT_texture_shadow_lod : enable
 #endif
 #if defined(GL_EXT_shader_image_load_store)
 #extension GL_EXT_shader_image_load_store : enable
 #endif
-#if defined(GL_ARB_explicit_uniform_location)
-#extension GL_ARB_explicit_uniform_location : enable
-#endif
 )";
 
-    // Uniform block definitions
+    // Add uniform blocks
     out += VSPicaUniformBlockDef;
     out += VSUniformBlockDef;
 
-    // Track which registers are used
+    // Track which input registers are used
     std::array<bool, 16> used_regs{};
     const auto get_input_reg = [&used_regs](u32 reg) {
         ASSERT(reg < 16);
@@ -311,47 +217,55 @@ std::string_view MakeLoadPrefix(AttribLoadFlags flag) {
         return "";
     };
 
-    const auto program_source = DecompileProgram(setup.program_code, setup.swizzle_data,
-                                                 config.state.main_offset, get_input_reg,
-                                                 get_output_reg, config.state.sanitize_mul);
+    // Decompile program to get main shader body
+    std::string program_source =
+        DecompileProgram(setup.program_code, setup.swizzle_data, config.state.main_offset,
+                         get_input_reg, get_output_reg, config.state.sanitize_mul);
+
     if (program_source.empty()) {
         return "";
     }
 
-    // Input declarations
-    for (size_t i = 0; i < used_regs.size(); ++i) {
+    // Input attributes
+    for (std::size_t i = 0; i < used_regs.size(); ++i) {
         if (used_regs[i]) {
             const auto flags = config.state.load_flags[i];
-            std::string_view prefix = MakeLoadPrefix(flags);
+            const std::string_view prefix = MakeLoadPrefix(flags);
             out += fmt::format("layout(location = {0}) in {1}vec4 vs_in_typed_reg{0};\n", i, prefix);
             out += fmt::format("vec4 vs_in_reg{0};\n", i);
         }
     }
-
     out += '\n';
 
-    // Output declarations
-    if (!config.state.use_geometry_shader) {
-        out += GetVertexInterfaceDeclaration(true, config.state.use_clip_planes, separable_shader);
-        for (u32 i = 0; i < config.state.num_outputs; ++i) {
-            out += fmt::format("layout(location = {}) out vec4 vs_out_attr{};\n", i, i);
-        }
-    } else {
-        for (u32 i = 0; i < config.state.num_outputs; ++i) {
-            out += fmt::format("layout(location = {}) out vec4 vs_out_attr{};\n", i, i);
-        }
-        out += "void EmitVtx() {}\n";
+    // Output attributes
+    for (u32 i = 0; i < config.state.num_outputs; ++i) {
+        out += fmt::format("layout(location = {}) out vec4 vs_out_attr{};\n", i, i);
     }
 
-    const auto semantic = [&state = config.state](VSOutputAttributes::Semantic slot) -> std::string {
-        const u32 slot_id = static_cast<u32>(slot);
-        const u32 attrib = state.gs_state.semantic_maps[slot_id].attribute_index;
-        const u32 comp = state.gs_state.semantic_maps[slot_id].component_index;
+    // Provide fallback semantics for EmitVtx
+    const auto semantic = [&state = config.state](VSOutputAttributes::Semantic slot_semantic) -> std::string {
+        const u32 slot = static_cast<u32>(slot_semantic);
+        const u32 attrib = state.gs_state.semantic_maps[slot].attribute_index;
+        const u32 comp = state.gs_state.semantic_maps[slot].component_index;
         if (attrib < state.gs_state.gs_output_attributes) {
             return fmt::format("vs_out_attr{}.{}", attrib, "xyzw"[comp]);
         }
         return "1.0";
     };
+
+    // Provide basic geometry and view emission helpers
+    out += R"(
+const vec2 EPSILON_Z = vec2(0.000001f, -1.00001f);
+
+vec4 SanitizeVertex(vec4 vtx_pos) {
+    float ndc_z = vtx_pos.z / vtx_pos.w;
+    if (ndc_z > 0.0f && ndc_z < EPSILON_Z[0])
+        vtx_pos.z = 0.0f;
+    if (ndc_z < -1.0f && ndc_z > EPSILON_Z[1])
+        vtx_pos.z = -vtx_pos.w;
+    return vtx_pos;
+}
+)";
 
     out += "vec4 GetVertexQuaternion() {\n";
     out += "    return vec4(" + semantic(VSOutputAttributes::QUATERNION_X) + ", " +
@@ -367,31 +281,13 @@ std::string_view MakeLoadPrefix(AttribLoadFlags flag) {
            semantic(VSOutputAttributes::POSITION_W) + ");\n";
     out += "    vtx_pos = SanitizeVertex(vtx_pos);\n";
     out += "    gl_Position = vec4(vtx_pos.x, vtx_pos.y, -vtx_pos.z, vtx_pos.w);\n";
-    if (config.state.use_clip_planes) {
-        out += "    gl_ClipDistance[0] = -vtx_pos.z;\n";
-        out += "    if (enable_clip1) gl_ClipDistance[1] = dot(clip_coef, vtx_pos);\n";
-        out += "    else gl_ClipDistance[1] = 0.0;\n";
-    }
-    out += "    normquat = GetVertexQuaternion();\n";
-    out += "    primary_color = vec4(" + semantic(VSOutputAttributes::COLOR_R) + ", " +
-           semantic(VSOutputAttributes::COLOR_G) + ", " +
-           semantic(VSOutputAttributes::COLOR_B) + ", " +
-           semantic(VSOutputAttributes::COLOR_A) + ");\n";
-    out += "    texcoord0 = vec2(" + semantic(VSOutputAttributes::TEXCOORD0_U) + ", " +
-           semantic(VSOutputAttributes::TEXCOORD0_V) + ");\n";
-    out += "    texcoord1 = vec2(" + semantic(VSOutputAttributes::TEXCOORD1_U) + ", " +
-           semantic(VSOutputAttributes::TEXCOORD1_V) + ");\n";
-    out += "    texcoord0_w = " + semantic(VSOutputAttributes::TEXCOORD0_W) + ";\n";
-    out += "    view = vec3(" + semantic(VSOutputAttributes::VIEW_X) + ", " +
-           semantic(VSOutputAttributes::VIEW_Y) + ", " +
-           semantic(VSOutputAttributes::VIEW_Z) + ");\n";
-    out += "    texcoord2 = vec2(" + semantic(VSOutputAttributes::TEXCOORD2_U) + ", " +
-           semantic(VSOutputAttributes::TEXCOORD2_V) + ");\n";
-    out += "}\n";
+    out += "}\n\n";
 
-    out += "bool exec_shader();\n";
+    // Main function
+    out += "bool exec_shader();\n\n";
+
     out += "void main() {\n";
-    for (size_t i = 0; i < used_regs.size(); ++i) {
+    for (std::size_t i = 0; i < used_regs.size(); ++i) {
         if (used_regs[i]) {
             out += fmt::format("    vs_in_reg{0} = vec4(vs_in_typed_reg{0});\n", i);
             if (True(config.state.load_flags[i] & AttribLoadFlags::ZeroW)) {
@@ -399,25 +295,37 @@ std::string_view MakeLoadPrefix(AttribLoadFlags flag) {
             }
         }
     }
+
     out += "    exec_shader();\n";
     out += "    EmitVtx();\n";
     out += "}\n";
 
-    out += program_source;
-    return out;
-}*/
+    // Strip #version from body if it snuck in
+    std::string cleaned_source;
+    std::istringstream src(program_source);
+    std::string line;
+    while (std::getline(src, line)) {
+        if (!line.starts_with("#version"))
+            cleaned_source += line + '\n';
+    }
+    out += cleaned_source;
 
-std::string GenerateVertexShader(const ShaderSetup& setup, const PicaVSConfig& config,
+    return out;
+}
+
+/*std::string GenerateVertexShader(const ShaderSetup& setup, const PicaVSConfig& config,
                                  bool separable_shader) {
+#ifndef __APPLE__
+    GLint majorVersion = 0, minorVersion = 0;
+    glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
+    glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
+#endif
+
     std::string out;
     if (separable_shader) {
         out += "#extension GL_ARB_separate_shader_objects : enable\n";
 
 #ifndef __APPLE__
-        GLint majorVersion = 0, minorVersion = 0;
-        glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
-        glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
-
         if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
             out += R"(
 #extension GL_ARB_separate_shader_objects : enable
@@ -435,6 +343,50 @@ layout(location = ATTRIBUTE_VIEW) out vec3 view;
 
     out += VSPicaUniformBlockDef;
     out += VSUniformBlockDef;
+
+#ifndef __APPLE__
+    if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
+        // Handle output attributes directly in vertex shader
+        out += GetVertexInterfaceDeclaration(true, config.state.use_clip_planes, separable_shader);
+
+        // Output attributes declaration
+        for (u32 i = 0; i < config.state.num_outputs; ++i) {
+            if (separable_shader) {
+                out += fmt::format("layout(location = {}) out ", i);
+            } else {
+                out += "out ";
+            }
+            out += fmt::format("vec4 vs_out_attr{};\n", i);
+        }
+
+        // Move geometry shader functionality into vertex shader
+        if (!config.state.use_geometry_shader) {
+            const auto semantic =
+                [&state = config.state](VSOutputAttributes::Semantic slot_semantic) -> std::string {
+                const u32 slot = static_cast<u32>(slot_semantic);
+                const u32 attrib = state.gs_state.semantic_maps[slot].attribute_index;
+                const u32 comp = state.gs_state.semantic_maps[slot].component_index;
+                if (attrib < state.gs_state.gs_output_attributes) {
+                    return fmt::format("vs_out_attr{}.{}", attrib, "xyzw"[comp]);
+                }
+                return "1.0";
+            };
+
+            // Handle quaternion and position calculations directly
+            out += "void ProcessVertex() {\n";
+            out += "    vec4 vtx_quaternion = vec4(" + semantic(VSOutputAttributes::QUATERNION_X) +
+                   ", " + semantic(VSOutputAttributes::QUATERNION_Y) + ", " +
+                   semantic(VSOutputAttributes::QUATERNION_Z) + ", " +
+                   semantic(VSOutputAttributes::QUATERNION_W) + ");\n";
+
+            out += "    gl_Position = vec4(" + semantic(VSOutputAttributes::POSITION_X) + ", " +
+                   semantic(VSOutputAttributes::POSITION_Y) + ", " +
+                   semantic(VSOutputAttributes::POSITION_Z) + ", " +
+                   semantic(VSOutputAttributes::POSITION_W) + ");\n";
+            out += "}\n\n";
+        }
+    }
+#endif
 
     std::array<bool, 16> used_regs{};
     const auto get_input_reg = [&used_regs](u32 reg) {
@@ -567,7 +519,7 @@ layout(location = ATTRIBUTE_VIEW) out vec3 view;
     out += program_source;
 
     return out;
-}
+}*/
 
 static std::string GetGSCommonSource(const PicaGSConfigState& state, bool separable_shader) {
     std::string out = GetVertexInterfaceDeclaration(true, state.use_clip_planes, separable_shader);

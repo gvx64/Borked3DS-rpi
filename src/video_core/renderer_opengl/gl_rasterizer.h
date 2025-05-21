@@ -57,6 +57,8 @@ public:
                            u32 pixel_stride, ScreenInfo& screen_info);
     bool AccelerateDrawBatch(bool is_indexed) override;
 
+    void SetupHardwareVertexAttribPointers(); //gvx64 - Function to manually bind and enable each attribute in hardware vertex
+
 private:
     void SyncFixedState() override;
     void NotifyFixedFunctionPicaRegisterChanged(u32 id) override;

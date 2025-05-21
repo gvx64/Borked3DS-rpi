@@ -77,6 +77,15 @@ BlitHelper::BlitHelper(const Driver& driver_)
       d24s8_to_rgba8{CreateProgram(HostShaders::D24S8_TO_RGBA8_FRAG)},
       rgba4_to_rgb5a1{CreateProgram(HostShaders::RGBA4_TO_RGB5A1_FRAG)} {
     vao.Create();
+//gvx64    GLint majorVersion = 0, minorVersion = 0; //gvx64
+//gvx64    glGetIntegerv(GL_MAJOR_VERSION, &majorVersion); //gvx64
+//gvx64    glGetIntegerv(GL_MINOR_VERSION, &minorVersion); //gvx64
+//gvx64    if (!driver.IsOpenGLES() || (majorVersion >= 3 && minorVersion >= 2)) { //gvx64
+//gvx64        vao.Create(); //gvx64
+//gvx64    } else { //gvx64
+        // On GLES < 3.2, skip VAO creation
+        // We will use glVertexAttribPointer directly instead
+//gvx64    } //gvx64
     draw_fbo.Create();
     state.draw.vertex_array = vao.handle;
     for (u32 i = 0; i < 3; i++) {

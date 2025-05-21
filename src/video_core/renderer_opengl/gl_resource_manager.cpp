@@ -314,6 +314,30 @@ void OGLVertexArray::Release() {
     OpenGLState::GetCurState().ResetVertexArray(handle).Apply();
     handle = 0;
 }
+/*void OGLVertexArray::Release() { //gvx64
+    if (handle == 0)
+        return;
+
+    GLint majorVersion = 0, minorVersion = 0;
+    glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
+    glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
+
+    if (OpenGL::GLES && majorVersion == 3 && minorVersion < 2) {
+        // VAOs not supported or not used on GLES < 3.2
+        handle = 0;
+        return;
+    }
+
+    // Delete VAO using appropriate function
+    if (OpenGL::GLES && GLAD_GL_OES_vertex_array_object) {
+        glDeleteVertexArraysOES(1, &handle);
+    } else {
+        glDeleteVertexArrays(1, &handle);
+    }
+
+    OpenGLState::GetCurState().ResetVertexArray(handle).Apply();
+    handle = 0;
+} //gvx64*/
 
 void OGLFramebuffer::Create() {
     if (handle != 0)
