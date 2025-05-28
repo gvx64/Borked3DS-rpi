@@ -291,6 +291,7 @@ public:
             .has_logic_op = !driver.IsOpenGLES(),
             .has_gl_ext_framebuffer_fetch = driver.HasExtFramebufferFetch(),
             .has_gl_ext_texture_buffer = driver.HasExtTextureBuffer(),
+            .has_gl_oes_texture_buffer = driver.HasOesTextureBuffer(), //gvx64
             .has_gl_arm_framebuffer_fetch = driver.HasArmShaderFramebufferFetch(),
             .has_gl_arb_shader_image_load_store = !is_gles && driver.HasArbShaderImageLoadStore(),
             .has_gl_nv_fragment_shader_interlock = driver.HasNvFragmentShaderInterlock(),

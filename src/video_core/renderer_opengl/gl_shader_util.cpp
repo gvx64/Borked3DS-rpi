@@ -46,6 +46,10 @@ GLuint LoadShader(std::string_view source, GLenum type) {
 #extension GL_EXT_texture_buffer : enable
 #endif //defined(GL_EXT_texture_buffer)
 
+#if defined(GL_OES_texture_buffer) //gvx64
+#extension GL_OES_texture_buffer : enable //gvx64
+#endif //defined(GL_OES_texture_buffer) - gvx64
+
 #if defined(GL_EXT_texture_storage)
 #extension GL_EXT_texture_storage : enable
 #endif //defined(GL_EXT_texture_storage)
@@ -89,6 +93,9 @@ GLuint LoadShader(std::string_view source, GLenum type) {
                        "#if defined(GL_EXT_texture_buffer)\n"
                        "#extension GL_EXT_texture_buffer : enable\n"
                        "#endif //defined(GL_EXT_texture_buffer)\n"
+                       "#if defined(GL_OES_texture_buffer)\n" //gvx64
+                       "#extension GL_OES_texture_buffer : enable\n" //gvx64
+                       "#endif //defined(GL_OES_texture_buffer)\n" //gvx64
                        "#if defined(GL_EXT_texture_storage)\n"
                        "#extension GL_EXT_texture_storage : enable\n"
                        "#endif //defined(GL_EXT_texture_storage)\n"

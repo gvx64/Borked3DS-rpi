@@ -239,42 +239,48 @@ void OpenGLState::Apply() const {
         if (texture_buffer_lut_lf.texture_buffer !=
             cur_state.texture_buffer_lut_lf.texture_buffer) {
             glActiveTexture(TextureUnits::TextureBufferLUT_LF.Enum());
-            glBindTexture(GLAD_GL_EXT_texture_buffer ? GL_TEXTURE_BUFFER_EXT : GL_TEXTURE_2D, texture_buffer_lut_lf.texture_buffer);
+//gvx64            glBindTexture(GLAD_GL_EXT_texture_buffer ? GL_TEXTURE_BUFFER_EXT : GL_TEXTURE_2D, texture_buffer_lut_lf.texture_buffer);
+            glBindTexture(GLAD_GL_OES_texture_buffer ? GL_TEXTURE_BUFFER_OES : GL_TEXTURE_2D, texture_buffer_lut_lf.texture_buffer); //gvx64
         }
 
         // Texture buffer LUTs
         if (texture_buffer_lut_rg.texture_buffer !=
             cur_state.texture_buffer_lut_rg.texture_buffer) {
             glActiveTexture(TextureUnits::TextureBufferLUT_RG.Enum());
-            glBindTexture(GLAD_GL_EXT_texture_buffer ? GL_TEXTURE_BUFFER_EXT : GL_TEXTURE_2D, texture_buffer_lut_rg.texture_buffer);
+//gvx64            glBindTexture(GLAD_GL_EXT_texture_buffer ? GL_TEXTURE_BUFFER_EXT : GL_TEXTURE_2D, texture_buffer_lut_rg.texture_buffer);
+            glBindTexture(GLAD_GL_OES_texture_buffer ? GL_TEXTURE_BUFFER_OES : GL_TEXTURE_2D, texture_buffer_lut_rg.texture_buffer); //gvx64
         }
 
         // Texture buffer LUTs
         if (texture_buffer_lut_rgba.texture_buffer !=
             cur_state.texture_buffer_lut_rgba.texture_buffer) {
             glActiveTexture(TextureUnits::TextureBufferLUT_RGBA.Enum());
-            glBindTexture(GLAD_GL_EXT_texture_buffer ? GL_TEXTURE_BUFFER_EXT : GL_TEXTURE_2D, texture_buffer_lut_rgba.texture_buffer);
+//gvx64            glBindTexture(GLAD_GL_EXT_texture_buffer ? GL_TEXTURE_BUFFER_EXT : GL_TEXTURE_2D, texture_buffer_lut_rgba.texture_buffer);
+            glBindTexture(GLAD_GL_OES_texture_buffer ? GL_TEXTURE_BUFFER_OES : GL_TEXTURE_2D, texture_buffer_lut_rgba.texture_buffer); //gvx64
         }
     } else {
         // Texture buffer LUTs
         if (texture_buffer_lut_lf.texture_buffer !=
             cur_state.texture_buffer_lut_lf.texture_buffer) {
             glActiveTexture(TextureUnits::TextureBufferLUT_LF.Enum());
-            glBindTexture(GLAD_GL_EXT_texture_buffer ? GL_TEXTURE_BUFFER_EXT : GL_TEXTURE_2D, texture_buffer_lut_lf.texture_buffer);
+//gvx64            glBindTexture(GLAD_GL_EXT_texture_buffer ? GL_TEXTURE_BUFFER_EXT : GL_TEXTURE_2D, texture_buffer_lut_lf.texture_buffer);
+            glBindTexture(GLAD_GL_OES_texture_buffer ? GL_TEXTURE_BUFFER_OES : GL_TEXTURE_2D, texture_buffer_lut_lf.texture_buffer); //gvx64
         }
 
         // Texture buffer LUTs
         if (texture_buffer_lut_rg.texture_buffer !=
             cur_state.texture_buffer_lut_rg.texture_buffer) {
             glActiveTexture(TextureUnits::TextureBufferLUT_RG.Enum());
-            glBindTexture(GLAD_GL_EXT_texture_buffer ? GL_TEXTURE_BUFFER_EXT : GL_TEXTURE_2D, texture_buffer_lut_rg.texture_buffer);
+//gvx64            glBindTexture(GLAD_GL_EXT_texture_buffer ? GL_TEXTURE_BUFFER_EXT : GL_TEXTURE_2D, texture_buffer_lut_rg.texture_buffer);
+            glBindTexture(GLAD_GL_OES_texture_buffer ? GL_TEXTURE_BUFFER_OES : GL_TEXTURE_2D, texture_buffer_lut_rg.texture_buffer); //gvx64
         }
 
         // Texture buffer LUTs
         if (texture_buffer_lut_rgba.texture_buffer !=
             cur_state.texture_buffer_lut_rgba.texture_buffer) {
             glActiveTexture(TextureUnits::TextureBufferLUT_RGBA.Enum());
-            glBindTexture(GLAD_GL_EXT_texture_buffer ? GL_TEXTURE_BUFFER_EXT : GL_TEXTURE_2D, texture_buffer_lut_rgba.texture_buffer);
+//gvx64            glBindTexture(GLAD_GL_EXT_texture_buffer ? GL_TEXTURE_BUFFER_EXT : GL_TEXTURE_2D, texture_buffer_lut_rgba.texture_buffer);
+            glBindTexture(GLAD_GL_OES_texture_buffer ? GL_TEXTURE_BUFFER_OES : GL_TEXTURE_2D, texture_buffer_lut_rgba.texture_buffer); //gvx64
         }
     }
     // Color buffer

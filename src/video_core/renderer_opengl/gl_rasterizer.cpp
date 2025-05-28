@@ -72,6 +72,7 @@ GLenum MakeAttributeType(Pica::PipelineRegs::VertexAttributeFormat format) {
 
         // Use the minimum of the maximum available size and our desired size
         if (is_lf) {
+//gvx64            printf("../src/video_core/renderer_opengl/gl_rasterizer.cpp, TextureBufferSize(const Driver& driver, bool is_lf), max_size = %08x\n", max_size); //gvx64
             return std::min<GLsizeiptr>(max_size, 64 * 1024);
         }
         return std::min<GLsizeiptr>(max_size, 32 * 1024);
@@ -108,8 +109,8 @@ RasterizerOpenGL::RasterizerOpenGL(Memory::MemorySystem& memory, Pica::PicaCore&
       index_buffer{
           driver, GL_ELEMENT_ARRAY_BUFFER,
           static_cast<GLsizeiptr>(driver.IsOpenGLES() ? INDEX_BUFFER_SIZE / 2 : INDEX_BUFFER_SIZE)},
-      texture_buffer{driver, GL_TEXTURE_BUFFER, TextureBufferSize(driver, false)},
-      texture_lf_buffer{driver, GL_TEXTURE_BUFFER, TextureBufferSize(driver, true)} {
+      texture_buffer{driver, GL_TEXTURE_BUFFER_OES, TextureBufferSize(driver, false)},
+      texture_lf_buffer{driver, GL_TEXTURE_BUFFER_OES, TextureBufferSize(driver, true)} {
     const bool is_gles = driver.IsOpenGLES();
     GLint majorVersion = 0, minorVersion = 0;
     glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
@@ -151,35 +152,6 @@ RasterizerOpenGL::RasterizerOpenGL(Memory::MemorySystem& memory, Pica::PicaCore&
     state.draw.vertex_buffer = vertex_buffer.GetHandle();
     state.Apply();
 
-/*    glVertexAttribPointer(ATTRIBUTE_POSITION, 4, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
-                          (GLvoid*)offsetof(HardwareVertex, position));
-    glEnableVertexAttribArray(ATTRIBUTE_POSITION);
-
-    glVertexAttribPointer(ATTRIBUTE_COLOR, 4, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
-                          (GLvoid*)offsetof(HardwareVertex, color));
-    glEnableVertexAttribArray(ATTRIBUTE_COLOR);
-
-    glVertexAttribPointer(ATTRIBUTE_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
-                          (GLvoid*)offsetof(HardwareVertex, tex_coord0));
-    glVertexAttribPointer(ATTRIBUTE_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
-                          (GLvoid*)offsetof(HardwareVertex, tex_coord1));
-    glVertexAttribPointer(ATTRIBUTE_TEXCOORD2, 2, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
-                          (GLvoid*)offsetof(HardwareVertex, tex_coord2));
-    glEnableVertexAttribArray(ATTRIBUTE_TEXCOORD0);
-    glEnableVertexAttribArray(ATTRIBUTE_TEXCOORD1);
-    glEnableVertexAttribArray(ATTRIBUTE_TEXCOORD2);
-
-    glVertexAttribPointer(ATTRIBUTE_TEXCOORD0_W, 1, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
-                          (GLvoid*)offsetof(HardwareVertex, tex_coord0_w));
-    glEnableVertexAttribArray(ATTRIBUTE_TEXCOORD0_W);
-
-    glVertexAttribPointer(ATTRIBUTE_NORMQUAT, 4, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
-                          (GLvoid*)offsetof(HardwareVertex, normquat));
-    glEnableVertexAttribArray(ATTRIBUTE_NORMQUAT);
-
-    glVertexAttribPointer(ATTRIBUTE_VIEW, 3, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex),
-                          (GLvoid*)offsetof(HardwareVertex, view));
-    glEnableVertexAttribArray(ATTRIBUTE_VIEW);*/
     SetupHardwareVertexAttribPointers(); //gvx64
 
     // Allocate and bind texture buffer lut textures
@@ -193,14 +165,27 @@ RasterizerOpenGL::RasterizerOpenGL(Memory::MemorySystem& memory, Pica::PicaCore&
     glActiveTexture(TextureUnits::TextureBufferLUT_LF.Enum());
 
     if (is_gles && majorVersion == 3 && minorVersion < 2) {
-        // Check for GL_EXT_texture_buffer support
+/*        // Check for GL_EXT_texture_buffer support
         if (GLAD_GL_EXT_texture_buffer) {
             // Use floating-point formats if supported
             glTexBufferEXT(GL_TEXTURE_BUFFER, GL_RG32F, texture_lf_buffer.GetHandle());
             glActiveTexture(TextureUnits::TextureBufferLUT_RG.Enum());
             glTexBufferEXT(GL_TEXTURE_BUFFER, GL_RG32F, texture_buffer.GetHandle());
             glActiveTexture(TextureUnits::TextureBufferLUT_RGBA.Enum());
-            glTexBufferEXT(GL_TEXTURE_BUFFER, GL_RGBA32F, texture_buffer.GetHandle());
+            glTexBufferEXT(GL_TEXTURE_BUFFER, GL_RGBA32F, texture_buffer.GetHandle());*/
+        // Check for GL_OES_texture_buffer support
+        if (GLAD_GL_OES_texture_buffer) {
+            // Use floating-point formats if supported
+            glBindTexture(GL_TEXTURE_BUFFER_OES, texture_buffer_lut_lf.handle);
+            glTexBufferOES(GL_TEXTURE_BUFFER_OES, GL_RG32F, texture_lf_buffer.GetHandle());
+            glActiveTexture(TextureUnits::TextureBufferLUT_RG.Enum());
+            glBindTexture(GL_TEXTURE_BUFFER_OES, texture_buffer_lut_rg.handle);
+            glTexBufferOES(GL_TEXTURE_BUFFER_OES, GL_RG32F, texture_buffer.GetHandle());
+            glActiveTexture(TextureUnits::TextureBufferLUT_RGBA.Enum());
+            glBindTexture(GL_TEXTURE_BUFFER_OES, texture_buffer_lut_rgba.handle);
+            glTexBufferOES(GL_TEXTURE_BUFFER_OES, GL_RGBA32F, texture_buffer.GetHandle());
+            fs_uniform_block_data.data.use_texture2d_lut = 0;
+            using_texture2d_lut = false;
         } else {
             // Fallback: Use 1D textures emulated as 2D textures for GLES
             LOG_INFO(Render_OpenGL, "GL_EXT_texture_buffer not available, falling "
@@ -475,7 +460,6 @@ bool RasterizerOpenGL::AccelerateDrawBatch(bool is_indexed) {
 }
 
 bool RasterizerOpenGL::AccelerateDrawBatchInternal(bool is_indexed) {
-printf("../src/video_core/renderer_opengl/gl_rasterizer.cpp, RasterizerOpenGL::AccelerateDrawBatchInternal(bool is_indexed) - beginning \n");//gvx64
     const GLenum primitive_mode = MakePrimitiveMode(regs.pipeline.triangle_topology);
     auto [vs_input_index_min, vs_input_index_max, vs_input_size] = AnalyzeVertexArray(is_indexed);
 
@@ -1222,7 +1206,7 @@ void RasterizerOpenGL::SyncAndUploadLUTsLF() {
         return;
     }
 
-    if (is_gles && !GLAD_GL_EXT_texture_buffer) {
+    if (is_gles && !GLAD_GL_OES_texture_buffer) { //gvx64
         // Update 2D textures directly for the fallback path
         if (fs_uniform_block_data.lighting_lut_dirty_any) {
             for (unsigned index = 0; index < fs_uniform_block_data.lighting_lut_dirty.size();
@@ -1275,15 +1259,13 @@ void RasterizerOpenGL::SyncAndUploadLUTsLF() {
     } else {
         // Original buffer update code
         std::size_t bytes_used = 0;
-
-        glBindBuffer(GL_TEXTURE_BUFFER, texture_lf_buffer.GetHandle());
+        glBindBuffer(GL_TEXTURE_BUFFER_OES, texture_lf_buffer.GetHandle());
         const auto [buffer, offset, invalidate] =
             texture_lf_buffer.Map(max_size, sizeof(Common::Vec4f));
-
+//gvx64printf("../src/video_core/renderer_opengl/gl_rasterizer.cpp, lutslf(), offset = %08lx, invalidate = %08x\n",offset, invalidate); //gvx64
         // Sync the lighting luts
         if (fs_uniform_block_data.lighting_lut_dirty_any || invalidate) {
-            for (unsigned index = 0; index < fs_uniform_block_data.lighting_lut_dirty.size();
-                 index++) {
+            for (unsigned index = 0; index < fs_uniform_block_data.lighting_lut_dirty.size(); index++) {
                 if (fs_uniform_block_data.lighting_lut_dirty[index] || invalidate) {
                     std::array<Common::Vec2f, 256> new_data;
                     const auto& source_lut = pica.lighting.luts[index];
@@ -1350,7 +1332,7 @@ void RasterizerOpenGL::SyncAndUploadLUTs() {
         return;
     }
 
-    if (is_gles && !GLAD_GL_EXT_texture_buffer) {
+    if (is_gles && !GLAD_GL_OES_texture_buffer) { //gvx64
         // Update 2D textures directly for the fallback path
         if (fs_uniform_block_data.proctex_noise_lut_dirty) {
             std::array<Common::Vec2f, 128> new_data;
@@ -1449,9 +1431,8 @@ void RasterizerOpenGL::SyncAndUploadLUTs() {
     } else {
         // Original buffer update code
         std::size_t bytes_used = 0;
-        glBindBuffer(GL_TEXTURE_BUFFER, texture_buffer.GetHandle());
-        const auto [buffer, offset, invalidate] =
-            texture_buffer.Map(max_size, sizeof(Common::Vec4f));
+        glBindBuffer(GL_TEXTURE_BUFFER_OES, texture_buffer.GetHandle());
+        const auto [buffer, offset, invalidate] = texture_buffer.Map(max_size, sizeof(Common::Vec4f));
 
         // helper function for SyncProcTexNoiseLUT/ColorMap/AlphaMap
         const auto sync_proc_tex_value_lut =
@@ -1472,24 +1453,28 @@ void RasterizerOpenGL::SyncAndUploadLUTs() {
                 }
             };
 
+        // Sync the proctex noise lut
         if (fs_uniform_block_data.proctex_noise_lut_dirty || invalidate) {
             sync_proc_tex_value_lut(pica.proctex.noise_table, proctex_noise_lut_data,
                                     fs_uniform_block_data.data.proctex_noise_lut_offset);
             fs_uniform_block_data.proctex_noise_lut_dirty = false;
         }
 
+        // Sync the proctex color map
         if (fs_uniform_block_data.proctex_color_map_dirty || invalidate) {
             sync_proc_tex_value_lut(pica.proctex.color_map_table, proctex_color_map_data,
                                     fs_uniform_block_data.data.proctex_color_map_offset);
             fs_uniform_block_data.proctex_color_map_dirty = false;
         }
 
+        // Sync the proctex alpha map
         if (fs_uniform_block_data.proctex_alpha_map_dirty || invalidate) {
             sync_proc_tex_value_lut(pica.proctex.alpha_map_table, proctex_alpha_map_data,
-                                    fs_uniform_block_data.data.proctex_alpha_map_offset);
+                                   fs_uniform_block_data.data.proctex_alpha_map_offset);
             fs_uniform_block_data.proctex_alpha_map_dirty = false;
         }
 
+        // Sync the proctex lut
         if (fs_uniform_block_data.proctex_lut_dirty || invalidate) {
             std::array<Common::Vec4f, 256> new_data;
 
@@ -1511,12 +1496,12 @@ void RasterizerOpenGL::SyncAndUploadLUTs() {
             fs_uniform_block_data.proctex_lut_dirty = false;
         }
 
+        // Sync the proctex difference lut
         if (fs_uniform_block_data.proctex_diff_lut_dirty || invalidate) {
             std::array<Common::Vec4f, 256> new_data;
 
-            std::transform(pica.proctex.color_diff_table.begin(),
-                           pica.proctex.color_diff_table.end(), new_data.begin(),
-                           [](const auto& entry) {
+            std::transform(pica.proctex.color_diff_table.begin(), pica.proctex.color_diff_table.end(),
+                           new_data.begin(), [](const auto& entry) {
                                auto rgba = entry.ToVector() / 255.0f;
                                return Common::Vec4f{rgba.r(), rgba.g(), rgba.b(), rgba.a()};
                            });

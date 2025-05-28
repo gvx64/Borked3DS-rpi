@@ -353,6 +353,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<CONFIG>)
 # System imported libraries
 # ======================
 
+# Set OpenGL ES 3.2 texture buffer functionality as supported on Raspberry Pi
+set(ENV{MESA_EXTENSION_OVERRIDE} "GL_OES_texture_buffer")
+
 # Prefer the -pthread flag on Linux.
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)

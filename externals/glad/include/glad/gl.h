@@ -1767,11 +1767,17 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_TEXTURE_BORDER_COLOR_EXT 0x1004
 #define GL_TEXTURE_BUFFER_BINDING 0x8C2A
 #define GL_TEXTURE_BUFFER_BINDING_EXT 0x8C2A
+#define GL_TEXTURE_BUFFER_BINDING_OES 0x8C2A //gvx64
 #define GL_TEXTURE_BUFFER_DATA_STORE_BINDING_EXT 0x8C2D
+#define GL_TEXTURE_BUFFER_DATA_STORE_BINDING_OES 0x8C2D //gvx64
 #define GL_TEXTURE_BUFFER_EXT 0x8C2A
+#define GL_TEXTURE_BUFFER_OES 0x8C2A //gvx64
 #define GL_TEXTURE_BUFFER_OFFSET_ALIGNMENT_EXT 0x919F
+#define GL_TEXTURE_BUFFER_OFFSET_ALIGNMENT_OES 0x919F //gvx64
 #define GL_TEXTURE_BUFFER_OFFSET_EXT 0x919D
+#define GL_TEXTURE_BUFFER_OFFSET_OES 0x919D //gvx64
 #define GL_TEXTURE_BUFFER_SIZE_EXT 0x919E
+#define GL_TEXTURE_BUFFER_SIZE_OES 0x919E //gvx64
 #define GL_TEXTURE_COMPARE_FUNC_EXT 0x884D
 #define GL_TEXTURE_COMPARE_MODE_EXT 0x884C
 #define GL_TEXTURE_VIEW_MIN_LAYER_OES 0x82DD
@@ -1986,7 +1992,8 @@ GLAD_API_CALL int GLAD_GL_OES_texture_npot;
 GLAD_API_CALL int GLAD_GL_OES_texture_view;
 #define GL_OES_vertex_array_object 1
 GLAD_API_CALL int GLAD_GL_OES_vertex_array_object;
-
+#define GL_OES_texture_buffer 1 //gvx64
+GLAD_API_CALL int GLAD_GL_OES_texture_buffer; //gvx64
 
 typedef void (GLAD_API_PTR *PFNGLACTIVEPROGRAMEXTPROC)(GLuint program);
 typedef void (GLAD_API_PTR *PFNGLACTIVESHADERPROGRAMPROC)(GLuint pipeline, GLuint program);
@@ -2627,6 +2634,8 @@ typedef void (GLAD_API_PTR *PFNGLTEXPARAMETERIUIVEXTPROC)(GLenum target, GLenum 
 typedef void (GLAD_API_PTR *PFNGLTEXTUREVIEWOESPROC)(GLuint texture, GLenum target, GLuint origtexture, GLenum internalformat, GLuint minlevel, GLuint numlevels, GLuint minlayer, GLuint numlayers);
 typedef void (GLAD_API_PTR *PFNGLUSEPROGRAMSTAGESEXTPROC)(GLuint pipeline, GLbitfield stages, GLuint program);
 typedef void (GLAD_API_PTR *PFNGLVALIDATEPROGRAMPIPELINEEXTPROC)(GLuint pipeline);
+typedef void (GLAD_API_PTR *PFNGLTEXBUFFEROESPROC)(GLenum target, GLenum internalformat, GLuint buffer); //gvx64
+typedef void (GLAD_API_PTR *PFNGLTEXBUFFERRANGEOESPROC)(GLenum target, GLenum internalformat, GLuint buffer, GLintptr offset, GLsizeiptr size); //gvx64
 
 GLAD_API_CALL PFNGLACTIVEPROGRAMEXTPROC glad_glActiveProgramEXT;
 #define glActiveProgramEXT glad_glActiveProgramEXT
@@ -3906,8 +3915,10 @@ GLAD_API_CALL PFNGLUSEPROGRAMSTAGESEXTPROC glad_glUseProgramStagesEXT;
 #define glUseProgramStagesEXT glad_glUseProgramStagesEXT
 GLAD_API_CALL PFNGLVALIDATEPROGRAMPIPELINEEXTPROC glad_glValidateProgramPipelineEXT;
 #define glValidateProgramPipelineEXT glad_glValidateProgramPipelineEXT
-
-
+GLAD_API_CALL PFNGLTEXBUFFEROESPROC glad_glTexBufferOES; //gvx64
+#define glTexBufferOES glad_glTexBufferOES //gvx64
+GLAD_API_CALL PFNGLTEXBUFFERRANGEOESPROC glad_glTexBufferRangeOES; //gxv64
+#define glTexBufferRangeOES glad_glTexBufferRangeOES //gvx64
 
 
 

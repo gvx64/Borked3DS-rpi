@@ -19,6 +19,7 @@ struct Profile {
     bool has_logic_op{};
     bool has_gl_ext_framebuffer_fetch{};
     bool has_gl_ext_texture_buffer{};
+    bool has_gl_oes_texture_buffer{}; //gvx64
     bool has_gl_arm_framebuffer_fetch{};
     bool has_gl_arb_shader_image_load_store{};
     bool has_gl_nv_fragment_shader_interlock{};

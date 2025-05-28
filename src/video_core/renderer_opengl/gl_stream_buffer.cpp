@@ -66,7 +66,12 @@ std::tuple<u8*, GLintptr, bool> OGLStreamBuffer::Map(GLsizeiptr size, GLintptr a
         invalidate = true;
 
         if (persistent) {
+//gvx64            while (glGetError() != 0 ) //gvx64
+//gvx64                continue; //flush the glGetError stack gvx64
             glUnmapBuffer(gl_target);
+//gvx64            unsigned int error = glGetError();
+//gvx64            if (error != 0 )
+//gvx64                printf("../src/video_core/renderer_opengl/gl_stream_buffer.cpp,  OGLStreamBuffer::Map(GLsizeiptr size, GLintptr alignment),glUnmapBuffer(gl_target);, error code = %x\n",error); //gvx64
         }
     }
 
@@ -75,8 +80,13 @@ std::tuple<u8*, GLintptr, bool> OGLStreamBuffer::Map(GLsizeiptr size, GLintptr a
         GLbitfield flags = GL_MAP_WRITE_BIT | (persistent ? GL_MAP_PERSISTENT_BIT : 0) |
                            (coherent ? GL_MAP_COHERENT_BIT : GL_MAP_FLUSH_EXPLICIT_BIT) |
                            (invalidate ? GL_MAP_INVALIDATE_BUFFER_BIT : GL_MAP_UNSYNCHRONIZED_BIT);
+//gvx64        while (glGetError() != 0 ) //gvx64
+//gvx64            continue; //flush the glGetError stack gvx64
         mapped_ptr = static_cast<u8*>(
             glMapBufferRange(gl_target, buffer_pos, buffer_size - buffer_pos, flags));
+//gvx64        unsigned int error = glGetError();
+//gvx64        if (error != 0)
+//gvx64            printf("../src/video_core/renderer_opengl/gl_stream_buffer.cpp,  OGLStreamBuffer::Map(GLsizeiptr size, GLintptr alignment),glMapBufferRange(gl_target, buffer_pos, buffer_size - buffer_pos, flags));, error code = %x\n",error); //gvx64
         mapped_offset = buffer_pos;
     }
 
@@ -87,11 +97,21 @@ void OGLStreamBuffer::Unmap(GLsizeiptr size) {
     ASSERT(size <= mapped_size);
 
     if (!coherent && size > 0) {
+//gvx64        while (glGetError() != 0 ) //gvx64
+//gvx64            continue; //flush the glGetError stack gvx64
         glFlushMappedBufferRange(gl_target, buffer_pos - mapped_offset, size);
+//gvx64        unsigned int error = glGetError();
+//gvx64        if (error != 0)
+//gvx64            printf("../src/video_core/renderer_opengl/gl_stream_buffer.cpp, OGLStreamBuffer::Unmap(GLsizeiptr size), glFlushMappedBufferRange(gl_target, buffer_pos - mapped_offset, size);, error code = %x\n",error); //gvx64
     }
 
     if (!persistent) {
+//gvx64        while (glGetError() != 0 ) //gvx64
+//gvx64            continue; //flush the glGetError stack gvx64
         glUnmapBuffer(gl_target);
+//gvx64        unsigned int error = glGetError();
+//gvx64        if (error != 0 )
+//gvx64            printf("../src/video_core/renderer_opengl/gl_stream_buffer.cpp, OGLStreamBuffer::Unmap(GLsizeiptr size),glUnmapBuffer(gl_target);, error code = %x\n",error); //gvx64
     }
 
     buffer_pos += size;

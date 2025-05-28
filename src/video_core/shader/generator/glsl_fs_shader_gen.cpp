@@ -989,77 +989,90 @@ void FragmentModule::WriteLighting() {
 
 void FragmentModule::WriteFog() {
     // Get index into fog LUT
-    if (config.texture.fog_flip) {
-        out += "float fog_index = (1.0 - float(depth)) * 128.0;\n";
-    } else {
-        out += "float fog_index = depth * 128.0;\n";
-    }
-
-    // Generate clamped fog factor from LUT for given fog index
-    out += "float fog_i = clamp(floor(fog_index), 0.0, 127.0);\n"
-           "float fog_f = fog_index - fog_i;\n";
-
-#ifndef __APPLE__
     GLint majorVersion = 0, minorVersion = 0;
     glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
     glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
 
-    if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
-        if (!profile.is_vulkan) {
-            out += R"(
-    vec2 fog_lut_entry;
-    if (use_texture2d_lut != 0) {
-        // 2D texture fallback path
-        vec2 tex_coord = vec2(float(fog_i)/128.0, 0.0);
-        fog_lut_entry = texture2D(texture_buffer_lut_lf, tex_coord).rg;
-    } else {
-        fog_lut_entry = texelFetch(texture_buffer_lut_lf, ivec2(int(fog_i) + fog_lut_offset, 0), 0).rg;
-    }
-)";
+    if ( (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) && GLAD_GL_OES_texture_buffer){ //gxv64 - primary path on the Pi if texBufferOES is supported
+        // Get index into fog LUT
+        out += "float fog_index = depth * 128.0;\n";
+        out += "float fog_i = clamp(floor(fog_index), 0.0, 127.0);\n";
+        out += "float fog_f = fog_index - fog_i;\n";
+
+        out += "vec2 fog_lut_entry = texelFetch(texture_buffer_lut_lf, int(fog_i) + fog_lut_offset).rg;\n";
+        out += "float fog_factor = clamp(fog_lut_entry.r + fog_lut_entry.g * fog_f, 0.0, 1.0);\n";
+        // Blend the fog
+        out += "combiner_output.rgb = mix(fog_color.rgb, combiner_output.rgb, fog_factor);\n";
+    }else{
+        if (config.texture.fog_flip) {
+            out += "float fog_index = (1.0 - float(depth)) * 128.0;\n";
         } else {
-            out += "vec2 fog_lut_entry = texelFetch(texture_buffer_lut_lf, ivec2(int(fog_i) + "
-                   "fog_lut_offset, 0), 0).rg;\n";
+            out += "float fog_index = depth * 128.0;\n";
         }
-    } else {
+
+        // Generate clamped fog factor from LUT for given fog index
+        out += "float fog_i = clamp(floor(fog_index), 0.0, 127.0);\n"
+               "float fog_f = fog_index - fog_i;\n";
+
+#ifndef __APPLE__
+
+        if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
+            if (!profile.is_vulkan) {
+               out += R"(
+        vec2 fog_lut_entry;
+        if (use_texture2d_lut != 0) {
+            // 2D texture fallback path
+            vec2 tex_coord = vec2(float(fog_i)/128.0, 0.0);
+            fog_lut_entry = texture2D(texture_buffer_lut_lf, tex_coord).rg;
+        } else {
+            fog_lut_entry = texelFetch(texture_buffer_lut_lf, ivec2(int(fog_i) + fog_lut_offset, 0), 0).rg;
+        }
+)";
+            } else {
+                out += "vec2 fog_lut_entry = texelFetch(texture_buffer_lut_lf, ivec2(int(fog_i) + "
+                       "fog_lut_offset, 0), 0).rg;\n";
+            }
+        } else {
+            if (!profile.is_vulkan) {
+                out += R"(
+        vec2 fog_lut_entry;
+        if (use_texture2d_lut != 0) {
+            // 2D texture fallback path
+            vec2 tex_coord = vec2(float(fog_i)/128.0, 0.0);
+            fog_lut_entry = texture2D(texture_buffer_lut_lf, tex_coord).rg;
+        } else {
+            fog_lut_entry = texelFetch(texture_buffer_lut_lf, int(fog_i) + fog_lut_offset).rg;
+        }
+)";
+            } else {
+                out += "vec2 fog_lut_entry = texelFetch(texture_buffer_lut_lf, int(fog_i) + "
+                       "fog_lut_offset).rg;\n";
+            }
+        }
+#else
         if (!profile.is_vulkan) {
             out += R"(
-    vec2 fog_lut_entry;
-    if (use_texture2d_lut != 0) {
-        // 2D texture fallback path
-        vec2 tex_coord = vec2(float(fog_i)/128.0, 0.0);
-        fog_lut_entry = texture2D(texture_buffer_lut_lf, tex_coord).rg;
-    } else {
-        fog_lut_entry = texelFetch(texture_buffer_lut_lf, int(fog_i) + fog_lut_offset).rg;
-    }
+        vec2 fog_lut_entry;
+        if (use_texture2d_lut != 0) {
+            // 2D texture fallback path
+            vec2 tex_coord = vec2(float(fog_i)/128.0, 0.0);
+            fog_lut_entry = texture2D(texture_buffer_lut_lf, tex_coord).rg;
+        } else {
+            fog_lut_entry = texelFetch(texture_buffer_lut_lf, int(fog_i) + fog_lut_offset).rg;
+        }
 )";
         } else {
             out += "vec2 fog_lut_entry = texelFetch(texture_buffer_lut_lf, int(fog_i) + "
                    "fog_lut_offset).rg;\n";
         }
-    }
-#else
-    if (!profile.is_vulkan) {
-        out += R"(
-    vec2 fog_lut_entry;
-    if (use_texture2d_lut != 0) {
-        // 2D texture fallback path
-        vec2 tex_coord = vec2(float(fog_i)/128.0, 0.0);
-        fog_lut_entry = texture2D(texture_buffer_lut_lf, tex_coord).rg;
-    } else {
-        fog_lut_entry = texelFetch(texture_buffer_lut_lf, int(fog_i) + fog_lut_offset).rg;
-    }
-)";
-    } else {
-        out += "vec2 fog_lut_entry = texelFetch(texture_buffer_lut_lf, int(fog_i) + "
-               "fog_lut_offset).rg;\n";
-    }
 #endif
 
-    out += "float fog_factor = fog_lut_entry.r + fog_lut_entry.g * fog_f;\n"
-           "fog_factor = clamp(fog_factor, 0.0, 1.0);\n";
+        out += "float fog_factor = fog_lut_entry.r + fog_lut_entry.g * fog_f;\n"
+               "fog_factor = clamp(fog_factor, 0.0, 1.0);\n";
 
-    // Blend the fog
-    out += "combiner_output.rgb = mix(fog_color.rgb, combiner_output.rgb, fog_factor);\n";
+        // Blend the fog
+        out += "combiner_output.rgb = mix(fog_color.rgb, combiner_output.rgb, fog_factor);\n";
+    }
 }
 
 void FragmentModule::WriteGas() {
@@ -1672,7 +1685,12 @@ void FragmentModule::DefineBindingsGL() {
 
     if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
         out += FSUniformBlockDef;
-        out += "layout(binding = 3) uniform highp sampler2D texture_buffer_lut_lf;\n";
+//gvx64        out += "layout(binding = 3) uniform highp sampler2D texture_buffer_lut_lf;\n";
+        if (GLAD_GL_OES_texture_buffer){ //gxv64
+            out += "layout(binding = 3) uniform highp samplerBuffer texture_buffer_lut_lf;\n"; //gvx64
+        }else{ //gvx64
+            out += "layout(binding = 3) uniform highp sampler2D texture_buffer_lut_lf;\n"; //gvx64
+        } //gvx64
         out += "layout(binding = 4) uniform highp sampler2D texture_buffer_lut_rg;\n";
         out += "layout(binding = 5) uniform highp sampler2D texture_buffer_lut_rgba;\n\n";
     }
@@ -1792,11 +1810,19 @@ float LookupLightingLUT(int lut_index, int index, float delta) {
 
     if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
         // Original texture buffer path
-        out += R"(
-    ivec2 coord = ivec2(lighting_lut_offset[lut_index >> 2][lut_index & 3] + index, 0);
-    vec2 entry = texelFetch(texture_buffer_lut_lf, coord, 0).rg;
-    return entry.r + entry.g * delta;
+        if (GLAD_GL_OES_texture_buffer){ //gxv64
+            out += R"(
+                int lut_offset = lighting_lut_offset[lut_index >> 2][lut_index & 3];
+                vec2 entry = texelFetch(texture_buffer_lut_lf, lut_offset + index).rg;
+                return entry.r + entry.g * delta;
 )";
+        }else{
+            out += R"(
+                ivec2 coord = ivec2(lighting_lut_offset[lut_index >> 2][lut_index & 3] + index, 0);
+                vec2 entry = texelFetch(texture_buffer_lut_lf, coord, 0).rg;
+                return entry.r + entry.g * delta;
+)";
+        }
     } else {
         out += R"(
     vec2 entry = texelFetch(texture_buffer_lut_lf, lighting_lut_offset[lut_index >> 2][lut_index & 3] + index).rg;

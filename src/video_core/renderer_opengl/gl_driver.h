@@ -170,6 +170,11 @@ public:
         return blend_minmax_factor;
     }
 
+    /// Returns true if the implementation supports GL_EXT_texture_buffer
+    bool HasOesTextureBuffer() const { //gvx64
+        return oes_texture_buffer; //gvx64
+    } //gvx64
+
 private:
     void ReportDriverInfo();
     void DeduceGLES();
@@ -200,6 +205,7 @@ private:
     bool nv_fragment_shader_interlock{};
     bool intel_fragment_shader_ordering{};
     bool blend_minmax_factor{};
+    bool oes_texture_buffer{}; //gvx64
 
     std::string_view gl_version{};
     std::string_view gpu_vendor{};

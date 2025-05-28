@@ -57,4 +57,5 @@ GL_OES_texture_half_float
 GL_OES_texture_npot
 GL_OES_texture_view
 GL_OES_vertex_array_object
+GL_OES_texture_buffer
 ```
