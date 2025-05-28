@@ -703,7 +703,8 @@ void main() {
         out << fmt::format("    prim_buffer[{}].attributes = vec4[{}](", vtx,
                            config.state.gs_output_attributes);
         for (u32 i = 0; i < config.state.vs_output_attributes; ++i) {
-            out << fmt::format("{}vs_out_attr{}[{}]", i == 0 ? "" : ", ", i, vtx);
+//gvx64            out << fmt::format("{}vs_out_attr{}[{}]", i == 0 ? "" : ", ", i, vtx);
+            out << fmt::format("{}vs_out_attr{}", i == 0 ? "" : ", ", i); //gvx64
         }
         out << ");\n";
     }
