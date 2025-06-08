@@ -211,7 +211,9 @@ vec4 secondary_fragment_color = vec4(0.0);
     }
 
     if (config.framebuffer.shadow_rendering) {
-        WriteShadow();
+        if ( ( GLAD_GL_ARB_shader_image_load_store || GL_SHADER_IMAGE_ATOMIC ) ) { //gvx64 - apply guards to executing WriteShadow() only when running gles renderer
+            WriteShadow(); //gvx64
+        }
     } else {
         out += "gl_FragDepth = depth;\n";
         // Round the final fragment color to maintain the PICA's 8 bits of precision
@@ -1081,7 +1083,37 @@ void FragmentModule::WriteGas() {
     out += "discard; }";
 }
 
+//gvx64 - shader re-write to fix launch crash in Poochy & Yoshi's Woolly World
 void FragmentModule::WriteShadow() {
+// Platform detection for GLES < 3.2
+GLint majorVersion = 0, minorVersion = 0;
+glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
+glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
+printf("../src/video_core/shader/generator/glsl_fs_shader_gen.cpp, profile.is_vulkan = %d\n", profile.is_vulkan);//gvx64
+if ( (!profile.is_vulkan) && (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2))){ //gvx64 updated path for pi4/5 to correct shader rendering issue in Poochy & Yoshi's Woolly World under GLES
+    out += R"(
+uint d = uint(clamp(depth, 0.0, 1.0) * float(0xFFFFFF));
+uint s = uint(combiner_output.g * float(0xFF));
+ivec2 image_coord = ivec2(gl_FragCoord.xy);
+)";
+
+    if (use_fragment_shader_interlock) {
+        out += R"(
+beginInvocationInterlock();
+uint old_shadow = imageLoad(shadow_buffer, image_coord).x;
+uint new_shadow = UpdateShadow(old_shadow, d, s);
+imageStore(shadow_buffer, image_coord, uvec4(new_shadow));
+endInvocationInterlock();
+)";
+    } else {
+            // Fallback for GLES 3.1: no atomic comp swap
+            out += R"(
+uint old_shadow = imageLoad(shadow_buffer, image_coord).x;
+uint new_shadow = UpdateShadow(old_shadow, d, s);
+imageStore(shadow_buffer, image_coord, uvec4(new_shadow));
+)";
+    }
+}else{ //gvx64 original path under Vulkan worked, so do not change
 #ifndef __APPLE__
     GLint majorVersion = 0, minorVersion = 0;
     glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
@@ -1157,6 +1189,7 @@ do {
 #endif
     }
 }
+} //gvx64
 
 void FragmentModule::WriteLogicOp() {
     const auto logic_op = config.framebuffer.logic_op.Value();
@@ -1718,9 +1751,15 @@ void FragmentModule::DefineBindingsGL() {
         for (u32 i = 0; i < postfixes.size(); i++) {
 #ifndef __APPLE__
             if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
-                out += fmt::format(
-                    "layout(binding = {}) uniform readonly sampler2D shadow_texture_{};\n", i,
-                    postfixes[i]);
+                if (!profile.is_vulkan){
+                    out += fmt::format(
+                        "layout(binding = {}) uniform sampler2D shadow_texture_{};\n", i, //gvx64 if gles renderer use updated path
+                        postfixes[i]);
+                } else {
+                    out += fmt::format(
+                        "layout(binding = {}) uniform readonly sampler2D shadow_texture_{};\n", i, //gvx64 - if Vulkan renderer being used leave as original
+                        postfixes[i]);
+                }
             } else {
                 out += fmt::format(
                     "layout(binding = {}, r32ui) uniform readonly uimage2D shadow_texture_{};\n", i,
@@ -1736,7 +1775,11 @@ void FragmentModule::DefineBindingsGL() {
     if (config.framebuffer.shadow_rendering) {
 #ifndef __APPLE__
         if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
-            out += "layout(binding = 6) uniform sampler2D shadow_buffer;\n\n";
+            if (!profile.is_vulkan){
+                out += "layout(binding = 6, r32ui) uniform uimage2D shadow_buffer;\n\n"; //gvx64 - if gles renderer being used use updated path
+            } else {
+                out += "layout(binding = 6) uniform sampler2D shadow_buffer;\n\n"; //gvx64 - if Vulkan renderer being used leave as original
+            }
         } else {
             out += "layout(binding = 6, r32ui) uniform uimage2D shadow_buffer;\n\n";
         }
@@ -1923,10 +1966,18 @@ uint UpdateShadow(uint pixel, uint d, uint s) {
     if (config.texture.texture0_type == TexturingRegs::TextureConfig::Shadow2D ||
         config.texture.texture0_type == TexturingRegs::TextureConfig::ShadowCube) {
         out += R"(
+
+// For when the shadow pixel is already a uint (e.g. uimage2D or uvec4 paths)
 float CompareShadow(uint pixel, uint z) {
     uvec2 p = DecodeShadow(pixel);
     return mix(float(p.y) * (1.0 / 255.0), 0.0, p.x <= z);
 }
+
+// For when the shadow pixel comes from a float-based sampler2D
+float CompareShadow(float pixel, uint z) { //gvx64
+    uint upixel = floatBitsToUint(pixel); //gvx64
+    return CompareShadow(upixel, z); // Reuse the uint overload - gvx64
+} //gvx64
 
 float mix2(vec4 s, vec2 a) {
     vec2 t = mix(s.xy, s.zw, a.yy);
@@ -1970,15 +2021,28 @@ vec4 shadowTexture(vec2 uv, float w) {
                 glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
 
                 if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
+printf("../src/video_core/shader/generator/glsl_fs_shader_gen.cpp, profile.is_vulkan = %d\n", profile.is_vulkan);//gvx64
+if (!profile.is_vulkan){
                     out += R"(
 float SampleShadow2D(ivec2 uv, uint z) {
-    if (any(bvec4(lessThan(uv, ivec2(0)), greaterThanEqual(uv, imageSize(shadow_texture_px)))))
+    if (any(bvec4(lessThan(uv, ivec2(0)), greaterThanEqual(uv, textureSize(shadow_texture_px, 0))))) //gvx64 - if gles renderer being used use updated path
         return 1.0;
     return CompareShadow(texelFetch(shadow_texture_px, uv, 0).x, z);
 }
 
 vec4 shadowTexture(vec2 uv, float w) {
 )";
+} else {
+                    out += R"(
+float SampleShadow2D(ivec2 uv, uint z) {
+    if (any(bvec4(lessThan(uv, ivec2(0)), greaterThanEqual(uv, imageSize(shadow_texture_px))))) //gvx64 - if Vulkan renderer being used leave as original
+        return 1.0;
+    return CompareShadow(texelFetch(shadow_texture_px, uv, 0).x, z);
+}
+
+vec4 shadowTexture(vec2 uv, float w) {
+)";
+}
                 } else {
                     out += R"(
 float SampleShadow2D(ivec2 uv, uint z) {
@@ -2004,9 +2068,11 @@ vec4 shadowTexture(vec2 uv, float w) {
                 if (!config.texture.shadow_texture_orthographic) {
                     out += "uv /= w;";
                 }
+printf("../src/video_core/shader/generator/glsl_fs_shader_gen.cpp, profile.is_vulkan = %d\n", profile.is_vulkan);//gvx64
+if (!profile.is_vulkan){ //gvx64 - if gles renderer being used use updated path
                 out += R"(
     uint z = uint(max(0, int(min(abs(w), 1.0) * float(0xFFFFFF)) - shadow_texture_bias));
-    vec2 coord = vec2(imageSize(shadow_texture_px)) * uv - vec2(0.5);
+    vec2 coord = vec2(textureSize(shadow_texture_px,0)) * uv - vec2(0.5); //gvx64 - gles path
     vec2 coord_floor = floor(coord);
     vec2 f = coord - coord_floor;
     ivec2 i = ivec2(coord_floor);
@@ -2018,6 +2084,22 @@ vec4 shadowTexture(vec2 uv, float w) {
     return vec4(mix2(s, f));
 }
 )";
+} else {
+                out += R"(
+    uint z = uint(max(0, int(min(abs(w), 1.0) * float(0xFFFFFF)) - shadow_texture_bias));
+    vec2 coord = vec2(imageSize(shadow_texture_px)) * uv - vec2(0.5); //gvx64 - Vulkan path
+    vec2 coord_floor = floor(coord);
+    vec2 f = coord - coord_floor;
+    ivec2 i = ivec2(coord_floor);
+    vec4 s = vec4(
+        SampleShadow2D(i              , z),
+        SampleShadow2D(i + ivec2(1, 0), z),
+        SampleShadow2D(i + ivec2(0, 1), z),
+        SampleShadow2D(i + ivec2(1, 1), z));
+    return vec4(mix2(s, f));
+}
+)";
+}
             }
         } else if (config.texture.texture0_type == TexturingRegs::TextureConfig::ShadowCube) {
             if (profile.is_vulkan) {
@@ -2181,9 +2263,11 @@ vec4 shadowTextureCube(vec2 uv, float w) {
 }
     )";
                 } else {
+printf("../src/video_core/shader/generator/glsl_fs_shader_gen.cpp, profile.is_vulkan = %d\n", profile.is_vulkan);//gvx64
+if (!profile.is_vulkan){
                     out += R"(
 vec4 shadowTextureCube(vec2 uv, float w) {
-    ivec2 size = imageSize(shadow_texture_px);
+    ivec2 size = textureSize(shadow_texture_px,0); //gvx64 - if gles renderer being used use updated path
     vec3 c = vec3(uv, w);
     vec3 a = abs(c);
     if (a.x > a.y && a.x > a.z) {
@@ -2263,11 +2347,180 @@ vec4 shadowTextureCube(vec2 uv, float w) {
     return vec4(mix2(s, f));
 }
     )";
+} else {
+                    out += R"(
+vec4 shadowTextureCube(vec2 uv, float w) {
+    ivec2 size = imageSize(shadow_texture_px); //gvx64 - if Vulkan renderer being used leave as original
+    vec3 c = vec3(uv, w);
+    vec3 a = abs(c);
+    if (a.x > a.y && a.x > a.z) {
+        w = a.x;
+        uv = -c.zy;
+        if (c.x < 0.0) uv.x = -uv.x;
+    } else if (a.y > a.z) {
+        w = a.y;
+        uv = c.xz;
+        if (c.y < 0.0) uv.y = -uv.y;
+    } else {
+        w = a.z;
+        uv = -c.xy;
+        if (c.z > 0.0) uv.x = -uv.x;
+    }
+    uint z = uint(max(0, int(min(w, 1.0) * float(0xFFFFFF)) - shadow_texture_bias));
+    vec2 coord = vec2(size) * (uv / w * vec2(0.5) + vec2(0.5)) - vec2(0.5);
+    vec2 coord_floor = floor(coord);
+    vec2 f = coord - coord_floor;
+    ivec2 i00 = ivec2(coord_floor);
+    ivec2 i10 = i00 + ivec2(1, 0);
+    ivec2 i01 = i00 + ivec2(0, 1);
+    ivec2 i11 = i00 + ivec2(1, 1);
+    ivec2 cmin = ivec2(0), cmax = size - ivec2(1, 1);
+    i00 = clamp(i00, cmin, cmax);
+    i10 = clamp(i10, cmin, cmax);
+    i01 = clamp(i01, cmin, cmax);
+    i11 = clamp(i11, cmin, cmax);
+    uvec4 pixels;
+    // This part should have been refactored into functions,
+    // but many drivers don't like passing uimage2D as parameters
+    if (a.x > a.y && a.x > a.z) {
+        if (c.x > 0.0)
+            pixels = uvec4(
+                imageLoad(shadow_texture_px, i00).r,
+                imageLoad(shadow_texture_px, i10).r,
+                imageLoad(shadow_texture_px, i01).r,
+                imageLoad(shadow_texture_px, i11).r);
+        else
+            pixels = uvec4(
+                imageLoad(shadow_texture_nx, i00).r,
+                imageLoad(shadow_texture_nx, i10).r,
+                imageLoad(shadow_texture_nx, i01).r,
+                imageLoad(shadow_texture_nx, i11).r);
+    } else if (a.y > a.z) {
+        if (c.y > 0.0)
+            pixels = uvec4(
+                imageLoad(shadow_texture_py, i00).r,
+                imageLoad(shadow_texture_py, i10).r,
+                imageLoad(shadow_texture_py, i01).r,
+                imageLoad(shadow_texture_py, i11).r);
+        else
+            pixels = uvec4(
+                imageLoad(shadow_texture_ny, i00).r,
+                imageLoad(shadow_texture_ny, i10).r,
+                imageLoad(shadow_texture_ny, i01).r,
+                imageLoad(shadow_texture_ny, i11).r);
+    } else {
+        if (c.z > 0.0)
+            pixels = uvec4(
+                imageLoad(shadow_texture_pz, i00).r,
+                imageLoad(shadow_texture_pz, i10).r,
+                imageLoad(shadow_texture_pz, i01).r,
+                imageLoad(shadow_texture_pz, i11).r);
+        else
+            pixels = uvec4(
+                imageLoad(shadow_texture_nz, i00).r,
+                imageLoad(shadow_texture_nz, i10).r,
+                imageLoad(shadow_texture_nz, i01).r,
+                imageLoad(shadow_texture_nz, i11).r);
+    }
+    vec4 s = vec4(
+        CompareShadow(pixels.x, z),
+        CompareShadow(pixels.y, z),
+        CompareShadow(pixels.z, z),
+        CompareShadow(pixels.w, z));
+    return vec4(mix2(s, f));
+}
+    )";
+}
                 }
 #else
+printf("../src/video_core/shader/generator/glsl_fs_shader_gen.cpp, profile.is_vulkan = %d\n", profile.is_vulkan);//gvx64
+if (!profile.is_vulkan){
                 out += R"(
 vec4 shadowTextureCube(vec2 uv, float w) {
-    ivec2 size = imageSize(shadow_texture_px);
+    ivec2 size = textureSize(shadow_texture_px,0); //gvx64 - if gles renderer being used use updated path
+    vec3 c = vec3(uv, w);
+    vec3 a = abs(c);
+    if (a.x > a.y && a.x > a.z) {
+        w = a.x;
+        uv = -c.zy;
+        if (c.x < 0.0) uv.x = -uv.x;
+    } else if (a.y > a.z) {
+        w = a.y;
+        uv = c.xz;
+        if (c.y < 0.0) uv.y = -uv.y;
+    } else {
+        w = a.z;
+        uv = -c.xy;
+        if (c.z > 0.0) uv.x = -uv.x;
+    }
+    uint z = uint(max(0, int(min(w, 1.0) * float(0xFFFFFF)) - shadow_texture_bias));
+    vec2 coord = vec2(size) * (uv / w * vec2(0.5) + vec2(0.5)) - vec2(0.5);
+    vec2 coord_floor = floor(coord);
+    vec2 f = coord - coord_floor;
+    ivec2 i00 = ivec2(coord_floor);
+    ivec2 i10 = i00 + ivec2(1, 0);
+    ivec2 i01 = i00 + ivec2(0, 1);
+    ivec2 i11 = i00 + ivec2(1, 1);
+    ivec2 cmin = ivec2(0), cmax = size - ivec2(1, 1);
+    i00 = clamp(i00, cmin, cmax);
+    i10 = clamp(i10, cmin, cmax);
+    i01 = clamp(i01, cmin, cmax);
+    i11 = clamp(i11, cmin, cmax);
+    uvec4 pixels;
+    // This part should have been refactored into functions,
+    // but many drivers don't like passing uimage2D as parameters
+    if (a.x > a.y && a.x > a.z) {
+        if (c.x > 0.0)
+            pixels = uvec4(
+                imageLoad(shadow_texture_px, i00).r,
+                imageLoad(shadow_texture_px, i10).r,
+                imageLoad(shadow_texture_px, i01).r,
+                imageLoad(shadow_texture_px, i11).r);
+        else
+            pixels = uvec4(
+                imageLoad(shadow_texture_nx, i00).r,
+                imageLoad(shadow_texture_nx, i10).r,
+                imageLoad(shadow_texture_nx, i01).r,
+                imageLoad(shadow_texture_nx, i11).r);
+    } else if (a.y > a.z) {
+        if (c.y > 0.0)
+            pixels = uvec4(
+                imageLoad(shadow_texture_py, i00).r,
+                imageLoad(shadow_texture_py, i10).r,
+                imageLoad(shadow_texture_py, i01).r,
+                imageLoad(shadow_texture_py, i11).r);
+        else
+            pixels = uvec4(
+                imageLoad(shadow_texture_ny, i00).r,
+                imageLoad(shadow_texture_ny, i10).r,
+                imageLoad(shadow_texture_ny, i01).r,
+                imageLoad(shadow_texture_ny, i11).r);
+    } else {
+        if (c.z > 0.0)
+            pixels = uvec4(
+                imageLoad(shadow_texture_pz, i00).r,
+                imageLoad(shadow_texture_pz, i10).r,
+                imageLoad(shadow_texture_pz, i01).r,
+                imageLoad(shadow_texture_pz, i11).r);
+        else
+            pixels = uvec4(
+                imageLoad(shadow_texture_nz, i00).r,
+                imageLoad(shadow_texture_nz, i10).r,
+                imageLoad(shadow_texture_nz, i01).r,
+                imageLoad(shadow_texture_nz, i11).r);
+    }
+    vec4 s = vec4(
+        CompareShadow(pixels.x, z),
+        CompareShadow(pixels.y, z),
+        CompareShadow(pixels.z, z),
+        CompareShadow(pixels.w, z));
+    return vec4(mix2(s, f));
+}
+    )";
+} else {
+                out += R"(
+vec4 shadowTextureCube(vec2 uv, float w) {
+    ivec2 size = imageSize(shadow_texture_px); //gvx64 - if Vulkan renderer being used leave as original
     vec3 c = vec3(uv, w);
     vec3 a = abs(c);
     if (a.x > a.y && a.x > a.z) {
