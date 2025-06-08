@@ -175,6 +175,9 @@ RasterizerOpenGL::RasterizerOpenGL(Memory::MemorySystem& memory, Pica::PicaCore&
             glTexBufferEXT(GL_TEXTURE_BUFFER, GL_RGBA32F, texture_buffer.GetHandle());*/
         // Check for GL_OES_texture_buffer support
         if (GLAD_GL_OES_texture_buffer) {
+            // Fallback: Use 1D textures emulated as 2D textures for GLES
+            LOG_INFO(Render_OpenGL, "GL_OES_texture_buffer is available, utilizing "
+                                    "primary code path");
             // Use floating-point formats if supported
             glBindTexture(GL_TEXTURE_BUFFER_OES, texture_buffer_lut_lf.handle);
             glTexBufferOES(GL_TEXTURE_BUFFER_OES, GL_RG32F, texture_lf_buffer.GetHandle());

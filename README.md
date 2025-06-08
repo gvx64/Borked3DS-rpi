@@ -22,6 +22,29 @@ Instructions for Building from Source:
 
 7. sudo make -j4
 
+To launch within PIXELS destop mode on Raspberry Pi, the following command can be used to theoretically boost performance in Borked3ds-rpi (setting this env var will enable support for the GLES 3.2 extension: GL_OES_texture_buffer - note that this extension is incompletely supported on the Pi4/Pi5 but works properly for the purposes of Borked3ds-rpi):
+```
+sudo env MESA_EXTENSION_OVERRIDE="GL_OES_texture_buffer" /home/pi/.../Borked3DS/Build/bin/Release/borked3ds
+```
+
+To launch outside of PIXELS desktop mode (eg. Raspberry Pi OS Lite):
+```
+sudo env MESA_EXTENSION_OVERRIDE="GL_OES_texture_buffer" xinit /home/pi/.../Borked3DS/Build/bin/Release/borked3ds
+```
+
+To launch within Retropie with GL_OES_texture_buffer support enabled, edit the contents of /etc/emulationstation/es_systems.cfg so that the 3DS entry appears as follows:
+```
+  <system>
+    <name>3ds</name>
+    <fullname>3ds</fullname>
+    <path>/home/pi/RetroPie/roms/3ds</path>
+    <extension>.3ds .zip  .3DS .ZIP </extension>
+    <command>env MESA_EXTENSION_OVERRIDE="GL_OES_texture_buffer" /opt/retropie/supplementary/runcommand/runcommand.sh 0 _SYS_ 3ds %ROM%</command>
+    <platform>3ds</platform>
+    <theme>3ds</theme>
+  </system>
+```
+
 <h1 align="center">
   <br>
   <a href="[https://github.com/Borked3DS]"><img src="https://github.com/user-attachments/assets/7fd0ed50-1e1f-4b0a-ba31-a524737705c5" alt="Borked3DS" width="200"></a>

@@ -1089,7 +1089,6 @@ void FragmentModule::WriteShadow() {
 GLint majorVersion = 0, minorVersion = 0;
 glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);
 glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
-printf("../src/video_core/shader/generator/glsl_fs_shader_gen.cpp, profile.is_vulkan = %d\n", profile.is_vulkan);//gvx64
 if ( (!profile.is_vulkan) && (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2))){ //gvx64 updated path for pi4/5 to correct shader rendering issue in Poochy & Yoshi's Woolly World under GLES
     out += R"(
 uint d = uint(clamp(depth, 0.0, 1.0) * float(0xFFFFFF));
@@ -2021,7 +2020,6 @@ vec4 shadowTexture(vec2 uv, float w) {
                 glGetIntegerv(GL_MINOR_VERSION, &minorVersion);
 
                 if (OpenGL::GLES && (majorVersion == 3 && minorVersion < 2)) {
-printf("../src/video_core/shader/generator/glsl_fs_shader_gen.cpp, profile.is_vulkan = %d\n", profile.is_vulkan);//gvx64
 if (!profile.is_vulkan){
                     out += R"(
 float SampleShadow2D(ivec2 uv, uint z) {
@@ -2068,7 +2066,6 @@ vec4 shadowTexture(vec2 uv, float w) {
                 if (!config.texture.shadow_texture_orthographic) {
                     out += "uv /= w;";
                 }
-printf("../src/video_core/shader/generator/glsl_fs_shader_gen.cpp, profile.is_vulkan = %d\n", profile.is_vulkan);//gvx64
 if (!profile.is_vulkan){ //gvx64 - if gles renderer being used use updated path
                 out += R"(
     uint z = uint(max(0, int(min(abs(w), 1.0) * float(0xFFFFFF)) - shadow_texture_bias));
@@ -2263,7 +2260,6 @@ vec4 shadowTextureCube(vec2 uv, float w) {
 }
     )";
                 } else {
-printf("../src/video_core/shader/generator/glsl_fs_shader_gen.cpp, profile.is_vulkan = %d\n", profile.is_vulkan);//gvx64
 if (!profile.is_vulkan){
                     out += R"(
 vec4 shadowTextureCube(vec2 uv, float w) {
@@ -2433,7 +2429,6 @@ vec4 shadowTextureCube(vec2 uv, float w) {
 }
                 }
 #else
-printf("../src/video_core/shader/generator/glsl_fs_shader_gen.cpp, profile.is_vulkan = %d\n", profile.is_vulkan);//gvx64
 if (!profile.is_vulkan){
                 out += R"(
 vec4 shadowTextureCube(vec2 uv, float w) {
