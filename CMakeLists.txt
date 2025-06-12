@@ -400,9 +400,16 @@ if (ENABLE_QT)
     message(STATUS "Using host Qt at ${QT_HOST_PATH}")
 endif()
 
-# Use system tsl::robin_map if available (otherwise we fallback to version bundled with dynarmic)
+# Use system tsl::robin_map
 if (NOT DYNARMIC_USE_BUNDLED_EXTERNALS)
-    find_package(tsl-robin-map QUIET)
+    message(STATUS "Looking for system-installed tsl::robin_map...")
+    find_package(tsl-robin-map REQUIRED)
+
+    if (tsl-robin-map_FOUND)
+        message(STATUS "Found tsl-robin-map: ${tsl-robin-map_DIR}")
+    else()
+        message(FATAL_ERROR "tsl-robin-map not found. Please install it on your system.")
+    endif()
 endif()
 
 # Platform-specific library requirements
