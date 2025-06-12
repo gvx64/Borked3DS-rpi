@@ -114,6 +114,16 @@ if ("x86_64" IN_LIST ARCHITECTURE OR "arm64" IN_LIST ARCHITECTURE)
             message(STATUS "Found dynarmic")
         endif()
     else()
+
+        if(NOT DYNARMIC_USE_BUNDLED_EXTERNALS) #gvx64 - prevent dynarmic/CMakeLists.txt from trying to install(TARGETS robin_map) and force use of system version
+            find_package(tsl-robin-map REQUIRED)
+            if(NOT TARGET robin_map)
+                add_library(robin_map INTERFACE)
+                target_link_libraries(robin_map INTERFACE tsl::robin_map)
+                message(STATUS "Using system-installed tsl::robin_map as robin_map")
+            endif()
+        endif() #gvx64 - end of code block addition
+        
         set(DYNARMIC_TESTS OFF CACHE BOOL "")
         set(DYNARMIC_FRONTENDS "A32" CACHE STRING "")
         set(DYNARMIC_USE_PRECOMPILED_HEADERS ${BORKED3DS_USE_PRECOMPILED_HEADERS} CACHE BOOL "")
