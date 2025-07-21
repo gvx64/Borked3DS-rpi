@@ -231,6 +231,8 @@ private:
     Settings::TextureFilter filter;
     bool dump_textures;
     bool use_custom_textures;
+    u64 program_id = 0; //gvx64
+    int forceFallBackToSW = 0;     /// gvx64 - Track instances of bad surfaces to force fall-back to software renderer
 };
 
 } // namespace VideoCore

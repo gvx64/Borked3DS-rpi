@@ -113,6 +113,14 @@ public:
     /// Serializes virtual precompiled shader cache file to real file
     void SaveVirtualPrecompiledFile();
 
+    /// Get current game's title id as u64
+    u64 GetProgramID(); //gvx64
+
+    static ShaderDiskCache& GetInstance() { //gvx64
+        static ShaderDiskCache instance(/*separable=*/false);
+        return instance;
+    }
+
 private:
     /// Loads the transferable cache. Returns empty on failure.
     std::optional<std::pair<ShaderDecompiledMap, ShaderDumpsMap>> LoadPrecompiledFile(
@@ -162,7 +170,7 @@ private:
     [[nodiscard]] std::string GetBaseDir() const;
 
     /// Get current game's title id as u64
-    u64 GetProgramID();
+//gvx64    u64 GetProgramID();
 
     /// Get current game's title id
     std::string GetTitleID();
