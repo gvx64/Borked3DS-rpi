@@ -89,8 +89,8 @@ ConfigureDialog::ConfigureDialog(QWidget* parent, HotkeyRegistry& registry_, Cor
     ui->tabWidget->addTab(storage_tab.get(), tr("Storage"));
     ui->tabWidget->addTab(online_tab.get(), tr("Online"));
     ui->tabWidget->addTab(ui_tab.get(), tr("UI"));
-    hotkeys_tab->Populate(registry);
 #endif
+    hotkeys_tab->Populate(registry);
 
     PopulateSelectionList();
 
