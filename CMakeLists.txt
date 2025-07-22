@@ -184,6 +184,9 @@ else()
     set(USE_DISCORD_PRESENCE OFF)
 endif()
 
+#gvx64 - enable experimental scrollbar in configuration menus for users with small screen sizes
+option(CONFIG_SCROLLABLE "Enable scrollbars in config dialogs for small screens" OFF)
+
 # Compile options
 CMAKE_DEPENDENT_OPTION(COMPILE_WITH_DWARF "Add DWARF debugging information" ${IS_DEBUG_BUILD} "MINGW" OFF)
 option(ENABLE_LTO "Enable link time optimization" ${DEFAULT_ENABLE_LTO})

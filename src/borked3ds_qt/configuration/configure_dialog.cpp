@@ -23,6 +23,20 @@
 #include "common/settings.h"
 #include "core/core.h"
 #include "ui_configure.h"
+#ifdef CONFIG_SCROLLABLE //gvx64 - configuration menu implement scrollbar functionality (experimental) if specified as cmake flag
+#include <QScrollArea>
+#endif
+
+#ifdef CONFIG_SCROLLABLE
+// gvx64: Helper function to wrap config tabs with scroll support
+static QScrollArea* MakeScrollable(QWidget* inner_widget) {
+    auto* scroll = new QScrollArea;
+    scroll->setWidget(inner_widget);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameStyle(QFrame::NoFrame);
+    return scroll;
+}
+#endif
 
 ConfigureDialog::ConfigureDialog(QWidget* parent, HotkeyRegistry& registry_, Core::System& system_,
                                  QString gl_renderer, std::span<const QString> physical_devices,
@@ -47,6 +61,21 @@ ConfigureDialog::ConfigureDialog(QWidget* parent, HotkeyRegistry& registry_, Cor
 
     ui->setupUi(this);
 
+#ifdef CONFIG_SCROLLABLE
+    ui->tabWidget->addTab(MakeScrollable(general_tab.get()), tr("General")); //gvx64 - enable experimental scroll bar in config menus
+    ui->tabWidget->addTab(MakeScrollable(system_tab.get()), tr("System"));
+    ui->tabWidget->addTab(MakeScrollable(input_tab.get()), tr("Input"));
+    ui->tabWidget->addTab(MakeScrollable(hotkeys_tab.get()), tr("Hotkeys"));
+    ui->tabWidget->addTab(MakeScrollable(graphics_tab.get()), tr("Graphics"));
+    ui->tabWidget->addTab(MakeScrollable(enhancements_tab.get()), tr("Enhancements"));
+    ui->tabWidget->addTab(MakeScrollable(layout_tab.get()), tr("Layout"));
+    ui->tabWidget->addTab(MakeScrollable(audio_tab.get()), tr("Audio"));
+    ui->tabWidget->addTab(MakeScrollable(camera_tab.get()), tr("Camera"));
+    ui->tabWidget->addTab(MakeScrollable(debug_tab.get()), tr("Debug"));
+    ui->tabWidget->addTab(MakeScrollable(storage_tab.get()), tr("Storage"));
+    ui->tabWidget->addTab(MakeScrollable(online_tab.get()), tr("Online"));
+    ui->tabWidget->addTab(MakeScrollable(ui_tab.get()), tr("UI"));
+#else
     ui->tabWidget->addTab(general_tab.get(), tr("General"));
     ui->tabWidget->addTab(system_tab.get(), tr("System"));
     ui->tabWidget->addTab(input_tab.get(), tr("Input"));
@@ -60,8 +89,8 @@ ConfigureDialog::ConfigureDialog(QWidget* parent, HotkeyRegistry& registry_, Cor
     ui->tabWidget->addTab(storage_tab.get(), tr("Storage"));
     ui->tabWidget->addTab(online_tab.get(), tr("Online"));
     ui->tabWidget->addTab(ui_tab.get(), tr("UI"));
-
     hotkeys_tab->Populate(registry);
+#endif
 
     PopulateSelectionList();
 
