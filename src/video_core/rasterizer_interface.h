@@ -40,9 +40,6 @@ public:
     /// Draw the current batch of triangles
     virtual void DrawTriangles() = 0;
 
-    /// Notify rasterizer that the specified PICA register has been changed
-    virtual void NotifyPicaRegisterChanged(u32 id) = 0;
-
     /// Notify rasterizer that all caches should be flushed to 3DS memory
     virtual void FlushAll() = 0;
 
@@ -81,8 +78,6 @@ public:
 
     virtual void LoadDiskResources([[maybe_unused]] const std::atomic_bool& stop_loading,
                                    [[maybe_unused]] const DiskResourceLoadCallback& callback) {}
-
-    virtual void SyncEntireState() {}
 
     void SetAccurateMul(bool accurate_mul_) {
         accurate_mul = accurate_mul_;

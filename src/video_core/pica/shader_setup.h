@@ -81,6 +81,7 @@ public:
     SwizzleData swizzle_data{};
     u32 entry_point{};
     const void* cached_shader{};
+    bool uniforms_dirty = true;
 
 private:
     bool program_code_hash_dirty{true};

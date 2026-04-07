@@ -965,9 +965,6 @@ void RendererOpenGL::CleanupVideoDumping() {
     mailbox->free_cv.notify_one();
 }
 
-void RendererOpenGL::Sync() {
-    rasterizer.SyncEntireState();
-}
 
 void RendererOpenGL::InitTouchCursorResources() { //gvx64
     // Create VAO and VBO for cursor

@@ -76,9 +76,6 @@ public:
     /// Writes the provided value to the GPU virtual address.
     void WriteReg(VAddr addr, u32 data);
 
-    /// Synchronizes fixed function renderer state with PICA registers.
-    void Sync();
-
     /// Returns a mutable reference to the renderer.
     [[nodiscard]] VideoCore::RendererBase& Renderer();
 

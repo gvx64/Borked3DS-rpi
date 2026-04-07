@@ -36,7 +36,6 @@ public:
 
     void SwapBuffers() override;
     void TryPresent(int timeout_ms, bool is_secondary) override {}
-    void Sync() override {}
 
 private:
     void PrepareRenderTarget();

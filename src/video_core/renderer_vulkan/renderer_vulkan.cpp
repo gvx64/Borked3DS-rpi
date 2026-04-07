@@ -95,10 +95,6 @@ RendererVulkan::~RendererVulkan() {
     }
 }
 
-void RendererVulkan::Sync() {
-    rasterizer.SyncEntireState();
-}
-
 void RendererVulkan::PrepareRendertarget() {
     LOG_DEBUG(Render_Vulkan, "Preparing rendertarget");
     const auto& framebuffer_config = pica.regs.framebuffer_config;

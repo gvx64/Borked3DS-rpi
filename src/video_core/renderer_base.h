@@ -61,9 +61,6 @@ public:
     /// Cleans up after video dumping is ended
     virtual void CleanupVideoDumping() {}
 
-    /// Synchronizes fixed function renderer state
-    virtual void Sync() {}
-
     /// This is called to notify the rendering backend of a surface change
     virtual void NotifySurfaceChanged() {}
 

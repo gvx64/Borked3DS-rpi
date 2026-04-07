@@ -300,10 +300,6 @@ void GPU::WriteReg(VAddr addr, u32 data) {
     }
 }
 
-void GPU::Sync() {
-    impl->renderer->Sync();
-}
-
 VideoCore::RendererBase& GPU::Renderer() {
     return *impl->renderer;
 }

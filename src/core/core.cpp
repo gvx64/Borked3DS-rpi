@@ -924,7 +924,6 @@ void System::serialize(Archive& ar, const unsigned int file_version) {
         timing->UnlockEventQueue();
         memory->SetDSP(*dsp_core);
         cheat_engine.Connect();
-        gpu->Sync();
 
         // Re-register gpu callback, because gsp service changed after service_manager got
         // serialized

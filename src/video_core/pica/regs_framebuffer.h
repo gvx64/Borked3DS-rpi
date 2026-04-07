@@ -252,6 +252,12 @@ struct FramebufferRegs {
         inline u32 GetHeight() const {
             return height + 1;
         }
+        // Returns true if the framebuffer is vertically flipped.
+        // On 3DS hardware this reflects the GPU output config flip bit.
+        // TODO: wire up the actual hardware register if flip issues are observed.
+        inline bool IsFlipped() const {
+            return false;
+        }
     } framebuffer;
 
     // Returns the number of bytes in the specified depth format

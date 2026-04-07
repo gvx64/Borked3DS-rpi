@@ -3,7 +3,6 @@
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
-#include <exception>
 #include <map>
 #include <set>
 #include <string>
@@ -360,8 +359,8 @@ private:
     }
 
     /// Generates code representing a bool uniform
-    std::string GetUniformBool(u32 index) const {
-        return fmt::format("uniforms.b[{}]", index);
+    std::string GetUniformBool(u32 index, bool invert_test = false) const {
+        return fmt::format("(uniforms.b & {}u) {} 0u", 1 << index, invert_test ? "==" : "!=");
     }
 
     /**
@@ -674,9 +673,8 @@ private:
                 if (instr.opcode.Value() == OpCode::Id::JMPC) {
                     condition = EvaluateCondition(instr.flow_control);
                 } else {
-                    bool invert_test = instr.flow_control.num_instructions & 1;
-                    condition = (invert_test ? "!" : "") +
-                                GetUniformBool(instr.flow_control.bool_uniform_id);
+                    const bool invert_test = instr.flow_control.num_instructions & 1;
+                    condition = GetUniformBool(instr.flow_control.bool_uniform_id, invert_test);
                 }
 
                 shader.AddLine("if ({}) {{", condition);
