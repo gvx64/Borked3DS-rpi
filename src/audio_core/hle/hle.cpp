@@ -400,15 +400,18 @@ StereoFrame16 DspHle::Impl::GenerateCurrentFrame() {
 }
 
 bool DspHle::Impl::Tick() {
-    StereoFrame16 current_frame = {};
+    bool is_on = GetDspState() == DspState::On;
 
-    // TODO: Check dsp::DSP semaphore (which indicates emulated application has finished writing to
-    // shared memory region)
-    current_frame = GenerateCurrentFrame();
+    if (is_on) {
+        StereoFrame16 current_frame = {};
 
-    parent.OutputFrame(std::move(current_frame));
+        // TODO: Check dsp::DSP semaphore (which indicates emulated application has finished writing
+        // to shared memory region)
+        current_frame = GenerateCurrentFrame();
+        parent.OutputFrame(std::move(current_frame));
+    }
 
-    return GetDspState() == DspState::On;
+    return is_on;
 }
 
 void DspHle::Impl::AudioTickCallback(s64 cycles_late) {

@@ -52,7 +52,7 @@ std::optional<u32> ShaderSetup::WriteUniformFloatReg(ShaderRegs& config, u32 val
 
 u64 ShaderSetup::GetProgramCodeHash() {
     if (program_code_hash_dirty) {
-        program_code_hash = Common::ComputeHash64(&program_code, sizeof(program_code));
+        program_code_hash = Common::ComputeHash64(program_code.data(), biggest_program_size * sizeof(u32));
         program_code_hash_dirty = false;
     }
     return program_code_hash;
@@ -60,7 +60,7 @@ u64 ShaderSetup::GetProgramCodeHash() {
 
 u64 ShaderSetup::GetSwizzleDataHash() {
     if (swizzle_data_hash_dirty) {
-        swizzle_data_hash = Common::ComputeHash64(&swizzle_data, sizeof(swizzle_data));
+        swizzle_data_hash = Common::ComputeHash64(swizzle_data.data(), biggest_swizzle_size * sizeof(u32));
         swizzle_data_hash_dirty = false;
     }
     return swizzle_data_hash;

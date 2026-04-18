@@ -74,6 +74,32 @@ public:
         swizzle_data_hash_dirty = true;
     }
 
+    inline void UpdateProgramCode(size_t offset, u32 value) {
+        u32& inst = program_code[offset];
+        if (inst == value)
+            return;
+        inst = value;
+        if (!program_code_hash_dirty) {
+            MarkProgramCodeDirty();
+        }
+        if ((offset + 1) > biggest_program_size) {
+            biggest_program_size = offset + 1;
+        }
+    }
+
+    inline void UpdateSwizzleData(size_t offset, u32 value) {
+        u32& data = swizzle_data[offset];
+        if (data == value)
+            return;
+        data = value;
+        if (!swizzle_data_hash_dirty) {
+            MarkSwizzleDataDirty();
+        }
+        if ((offset + 1) > biggest_swizzle_size) {
+            biggest_swizzle_size = offset + 1;
+        }
+    }
+
 public:
     Uniforms uniforms;
     PackedAttribute uniform_queue;
@@ -88,6 +114,8 @@ private:
     bool swizzle_data_hash_dirty{true};
     u64 program_code_hash{0xDEADC0DE};
     u64 swizzle_data_hash{0xDEADC0DE};
+    u32 biggest_program_size = MAX_PROGRAM_CODE_LENGTH;
+    u32 biggest_swizzle_size = MAX_SWIZZLE_DATA_LENGTH;
 
     friend class boost::serialization::access;
     template <class Archive>
