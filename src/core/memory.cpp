@@ -105,6 +105,20 @@ public:
     std::shared_ptr<BackingMem> n3ds_extra_ram_mem;
     std::shared_ptr<BackingMem> dsp_mem;
 
+    // Cached PLG_LDR pointer to avoid expensive named_ports string lookup on every
+    // rasterizer flush (RasterizerFlushVirtualRegion is called on every JIT memory
+    // read/write, making GetService() a ~40% CPU overhead during FMV playback).
+    mutable std::shared_ptr<Service::PLGLDR::PLG_LDR> cached_plg_ldr;
+    mutable bool plg_ldr_cache_valid = false;
+
+    std::shared_ptr<Service::PLGLDR::PLG_LDR> GetCachedPLGLDR() const {
+        if (!plg_ldr_cache_valid && system.KernelRunning()) {
+            cached_plg_ldr = Service::PLGLDR::GetService(system);
+            plg_ldr_cache_valid = true;
+        }
+        return cached_plg_ldr;
+    }
+
     Impl(Core::System& system_);
 
     const u8* GetPtr(Region r) const {
@@ -262,7 +276,7 @@ public:
             return {vram_mem, addr - VRAM_VADDR};
         }
         if (addr >= PLUGIN_3GX_FB_VADDR && addr < PLUGIN_3GX_FB_VADDR_END) {
-            auto plg_ldr = Service::PLGLDR::GetService(system);
+            auto plg_ldr = GetCachedPLGLDR();
             if (plg_ldr) {
                 return {fcram_mem,
                         addr - PLUGIN_3GX_FB_VADDR + plg_ldr->GetPluginFBAddr() - FCRAM_PADDR};
@@ -305,7 +319,7 @@ public:
         CheckRegion(LINEAR_HEAP_VADDR, LINEAR_HEAP_VADDR_END, FCRAM_PADDR);
         CheckRegion(NEW_LINEAR_HEAP_VADDR, NEW_LINEAR_HEAP_VADDR_END, FCRAM_PADDR);
         CheckRegion(VRAM_VADDR, VRAM_VADDR_END, VRAM_PADDR);
-        auto plg_ldr = Service::PLGLDR::GetService(system);
+        auto plg_ldr = GetCachedPLGLDR();
         if (plg_ldr && plg_ldr->GetPluginFBAddr()) {
             CheckRegion(PLUGIN_3GX_FB_VADDR, PLUGIN_3GX_FB_VADDR_END, plg_ldr->GetPluginFBAddr());
         }
@@ -698,7 +712,7 @@ std::vector<VAddr> MemorySystem::PhysicalToVirtualAddressForRasterizer(PAddr add
         return {addr - VRAM_PADDR + VRAM_VADDR};
     }
     // NOTE: Order matters here.
-    auto plg_ldr = Service::PLGLDR::GetService(impl->system);
+    auto plg_ldr = impl->GetCachedPLGLDR();
     if (plg_ldr) {
         auto fb_addr = plg_ldr->GetPluginFBAddr();
         if (addr >= fb_addr && addr < fb_addr + PLUGIN_3GX_FB_SIZE) {
