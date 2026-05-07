@@ -222,6 +222,8 @@ GLuint LoadProgram(bool separable_program, std::span<const GLuint> shaders) {
         glProgramParameteri(program_id, GL_PROGRAM_SEPARABLE, GL_TRUE);
     }
 
+    // gvx64: GL_PROGRAM_BINARY_RETRIEVABLE_HINT is core GLES 3.0.
+    // Must NOT use glProgramParameteriEXT — that only accepts GL_PROGRAM_SEPARABLE_EXT.
     glProgramParameteri(program_id, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
 
     glLinkProgram(program_id);

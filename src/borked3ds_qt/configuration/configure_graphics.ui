@@ -222,7 +222,12 @@
              </item>
              <item>
               <property name="text">
-                  <string>Performance</string>
+               <string>Performance</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>Max Performance (GLES/Pi4)</string>
               </property>
              </item>
              <item>

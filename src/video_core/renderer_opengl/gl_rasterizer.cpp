@@ -487,7 +487,14 @@ bool RasterizerOpenGL::SetupGeometryShader() {
     // Enable the quaternion fix-up geometry-shader only if we are actually doing
     // per-fragment lighting and care about proper quaternions. Otherwise just use
     // standard vertex+fragment shaders
-    if (regs.lighting.disable) {
+    // gvx64: MaxPerformance mode forces trivial GS on GLES to eliminate
+    // the VS x GS x FS combinatorial explosion causing fatal GPU hangs.
+    // Trade-off: slightly less accurate lighting interpolation on curved surfaces.
+    const bool force_trivial_gs =
+        OpenGL::GLES &&
+        Settings::values.optimize_spirv_output.GetValue() ==
+            Settings::OptimizeSpirv::MaxPerformance;
+    if (regs.lighting.disable || force_trivial_gs) {
         shader_manager.UseTrivialGeometryShader();
     } else {
         shader_manager.UseFixedGeometryShader(regs);

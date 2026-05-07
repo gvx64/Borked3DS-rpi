@@ -257,7 +257,12 @@ void OGLPipeline::Release() {
     if (handle == 0)
         return;
 
-    glDeleteProgramPipelines(1, &handle);
+    // gvx64: on GLES 3.1 only EXT-suffixed pipeline functions exist.
+    if (OpenGL::GLES) {
+        glDeleteProgramPipelinesEXT(1, &handle);
+    } else {
+        glDeleteProgramPipelines(1, &handle);
+    }
     OpenGLState::GetCurState().ResetPipeline(handle).Apply();
     handle = 0;
 }

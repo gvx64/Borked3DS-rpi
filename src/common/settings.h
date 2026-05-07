@@ -101,6 +101,12 @@ enum class AudioEmulation : u32 {
 enum class OptimizeSpirv : u32 {
     Disabled = 0,
     Performance = 1,
+    // gvx64: MaxPerformance - for GLES on Pi 4.
+    // Forces trivial geometry shader regardless of lighting state,
+    // eliminating the VS x GS x FS combinatorial explosion that causes
+    // fatal GPU hangs on VideoCore VI during glLinkProgram.
+    // Trade-off: slightly less accurate quaternion lighting interpolation.
+    MaxPerformance = 2,
     Size = 2,
 };
 

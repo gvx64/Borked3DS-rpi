@@ -12,6 +12,7 @@
 #include <variant>
 #include <glad/gl.h>
 #include "common/settings.h"
+#include "video_core/renderer_opengl/gl_vars.h"
 #include "core/frontend/emu_window.h"
 #include "video_core/pica/shader_setup.h"
 #include "video_core/renderer_opengl/gl_driver.h"
@@ -175,10 +176,6 @@ public:
         if (new_shader) {
             result = CodeGenerator(config, args...);
             cached_shader.Create(result->c_str(), ShaderType);
-            // Added printf() statement here to dump shader source //gvx64
-//gvx64            if (ShaderType == GL_FRAGMENT_SHADER && result) { //gvx64
-//gvx64                printf("--- Generated Fragment Shader Source ---\n%s\n--------------------------------------\n", result->c_str()); //gvx64 - for printing fragment shaders to console
-//gvx64            } //gvx64
         }
         return {cached_shader.GetHandle(), std::move(result)};
     }
@@ -329,6 +326,16 @@ public:
         std::size_t GetConfigHash() const {
             return Common::ComputeHash64(this, sizeof(std::size_t) * 3);
         }
+        // gvx64: hash by GL handle values instead of config hashes.
+        // Two tuples with different config hashes but identical GL handles
+        // produce identical programs — deduplicating by handle eliminates
+        // redundant glLinkProgram calls and GPU memory waste.
+        u64 GetHandleHash() const {
+            u64 h = static_cast<u64>(vs);
+            h = Common::HashCombine(h, static_cast<u64>(gs));
+            h = Common::HashCombine(h, static_cast<u64>(fs));
+            return h;
+        }
     };
 
     static_assert(offsetof(ShaderTuple, vs_hash) == 0, "ShaderTuple layout changed!");
@@ -364,7 +371,13 @@ bool ShaderProgramManager::UseProgrammableVertexShader(const Pica::RegsInternal&
 
     // Enable the geometry-shader only if we are actually doing per-fragment lighting
     // and care about proper quaternions. Otherwise just use standard vertex+fragment shaders
-    const bool use_geometry_shader = !regs.lighting.disable;
+    // gvx64: MaxPerformance forces trivial GS, so VS must output FS-compatible
+    // varyings directly (use_geometry_shader=false). Otherwise the VS outputs
+    // vs_out_attr* arrays that the FS cannot read, causing a link error.
+    const bool max_perf = OpenGL::GLES &&
+        Settings::values.optimize_spirv_output.GetValue() ==
+            Settings::OptimizeSpirv::MaxPerformance;
+    const bool use_geometry_shader = !regs.lighting.disable && !max_perf;
 
     PicaVSConfig config{regs, setup, driver.HasClipCullDistance(), use_geometry_shader,
                         accurate_mul};
@@ -450,9 +463,14 @@ void ShaderProgramManager::ApplyTo(OpenGLState& state, bool accurate_mul) {
         state.draw.shader_program = 0;
         state.draw.program_pipeline = impl->pipeline.handle;
     } else {
-        const u64 unique_identifier = impl->current.GetConfigHash();
-        OGLProgram& cached_program = impl->program_cache[unique_identifier];
+        // gvx64: use handle-based key to deduplicate combined programs.
+        // Config-hash key creates duplicate entries for VS programs that
+        // differ in config but produce identical GLSL (same GL handle).
+        const u64 handle_key = impl->current.GetHandleHash();
+        OGLProgram& cached_program = impl->program_cache[handle_key];
         if (cached_program.handle == 0) {
+            // Still use config hash for disk cache — it must match transferable entries
+            const u64 unique_identifier = impl->current.GetConfigHash();
             cached_program.Create(false,
                                   std::array{impl->current.vs, impl->current.gs, impl->current.fs});
             auto& disk_cache = impl->disk_cache;
