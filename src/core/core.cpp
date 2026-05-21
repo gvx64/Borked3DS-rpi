@@ -23,6 +23,8 @@
 #include "core/arm/dyncom/arm_dyncom.h"
 #include "core/cheats/cheats.h"
 #include "core/core.h"
+#include "core/memory.h"  // gvx64: for VRAM_PADDR/FCRAM_PADDR in LoadFromRAM
+#include "video_core/renderer_opengl/gl_vars.h"  // gvx64: g_emergency_sw_active
 #include "core/core_timing.h"
 #include "core/dumping/backend.h"
 #include "core/frontend/image_interface.h"
@@ -124,6 +126,53 @@ System::ResultStatus System::RunLoop(bool tight_loop) {
             LOG_INFO(Core, "Load completed");
         } catch (const std::exception& e) {
             LOG_ERROR(Core, "Error loading: {}", e.what());
+            status_details = e.what();
+            return ResultStatus::ErrorSavestate;
+        }
+        frame_limiter.WaitOnce();
+        return ResultStatus::Success;
+    }
+    case Signal::LoadFromRAM: {
+        // gvx64: restore pre-hang RAM savestate
+        LOG_INFO(Core, "gvx64: Begin load from RAM savestate");
+        try {
+            System::LoadStateFromRAM();
+            // gvx64: LoadStateFromRAM deserializes the full system state which
+            // restores use_hw_shader=true from the saved state. Force both the
+            // global and local slots to false so it sticks regardless of
+            // whether the setting is in per-game or global mode after restore.
+            Settings::values.use_hw_shader.SetGlobal(true);
+            Settings::values.use_hw_shader.SetValue(false); // sets global slot
+            Settings::values.use_hw_shader.SetGlobal(false);
+            Settings::values.use_hw_shader.SetValue(false); // sets local slot
+            Settings::values.use_hw_shader.SetGlobal(true); // back to global mode
+            // gvx64: block game shader compilation without affecting
+            // presentation shaders so screens stay visible after load.
+            OpenGL::g_emergency_sw_active.store(true);
+            // gvx64: The savestate captures GSP interrupt state mid-frame.
+            // Inject ALL interrupt types 3 times to drain any queued wait
+            // conditions — PSC0/PSC1 (memory fill), PDC0/PDC1 (VBlank),
+            // PPF (display transfer), P3D (draw complete), DMA (DMA complete).
+            // One injection was insufficient; the game stalled again on PPF or
+            // PSC after the first frame completed.
+            auto gsp = service_manager->GetService<Service::GSP::GSP_GPU>("gsp::Gpu");
+            if (gsp) {
+                // gvx64: Inject P3D only — signals draw completion to pica_core
+                // to unstick the immediate post-restore stall. PSC/PPF/DMA
+                // omitted: they corrupt framebuffer/display-transfer state
+                // causing top screen to duplicate onto bottom screen.
+                // PDC0/PDC1 omitted: recurrent timing event fires them at ~60Hz.
+                gsp->SignalInterrupt(Service::GSP::InterruptId::P3D);
+                LOG_INFO(Core,
+                    "gvx64: GSP synthetic P3D interrupt injected.");
+            } else {
+                LOG_ERROR(Core, "gvx64: Could not get GSP service for interrupt injection!");
+            }
+            LOG_WARNING(Core,
+                "gvx64: RAM savestate load completed. "
+                "HW shaders forced off (both slots) for remainder of session.");
+        } catch (const std::exception& e) {
+            LOG_ERROR(Core, "gvx64: Error loading from RAM: {}", e.what());
             status_details = e.what();
             return ResultStatus::ErrorSavestate;
         }

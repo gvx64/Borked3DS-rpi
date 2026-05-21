@@ -7,4 +7,5 @@
 
 namespace OpenGL {
 bool GLES;
+std::atomic<bool> g_emergency_sw_active{false}; // gvx64
 }

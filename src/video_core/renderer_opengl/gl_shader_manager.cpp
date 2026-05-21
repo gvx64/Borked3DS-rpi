@@ -355,6 +355,7 @@ public:
     std::unordered_map<u64, OGLProgram> program_cache;
     OGLPipeline pipeline;
     ShaderDiskCache disk_cache;
+    std::function<void()> pre_compile_callback; // gvx64: fired before glLinkProgram
 };
 
 ShaderProgramManager::ShaderProgramManager(Frontend::EmuWindow& emu_window_, const Driver& driver_,
@@ -364,6 +365,10 @@ ShaderProgramManager::ShaderProgramManager(Frontend::EmuWindow& emu_window_, con
       impl{std::make_unique<Impl>(driver_, separable)} {}
 
 ShaderProgramManager::~ShaderProgramManager() = default;
+
+void ShaderProgramManager::SetPreCompileCallback(std::function<void()> callback) {
+    impl->pre_compile_callback = std::move(callback);
+}
 
 bool ShaderProgramManager::UseProgrammableVertexShader(const Pica::RegsInternal& regs,
                                                        Pica::ShaderSetup& setup,
@@ -475,6 +480,13 @@ void ShaderProgramManager::ApplyTo(OpenGLState& state, bool accurate_mul) {
                                   std::array{impl->current.vs, impl->current.gs, impl->current.fs});
             auto& disk_cache = impl->disk_cache;
             disk_cache.SaveDumpToFile(unique_identifier, cached_program.handle, accurate_mul);
+            // gvx64: fire post-compile callback AFTER successful glLinkProgram.
+            // Saving state here guarantees the shader that just compiled is
+            // already in the cache — restoring this state will never immediately
+            // re-trigger the same fatal hang.
+            if (cached_program.handle != 0 && impl->pre_compile_callback) {
+                impl->pre_compile_callback();
+            }
         }
         state.draw.shader_program = cached_program.handle;
     }

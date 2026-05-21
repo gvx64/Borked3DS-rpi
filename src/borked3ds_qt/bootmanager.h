@@ -9,6 +9,7 @@
 #include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <pthread.h>  // gvx64: for GetEmuPthread()
 #include <QThread>
 #include <QWidget>
 #include "core/core.h"
@@ -78,10 +79,17 @@ public:
         SetRunning(false);
     };
 
+    // gvx64: Returns the pthread handle of the emu thread, set at the
+    // start of run(). Used by Emergency SW Fallback to send SIGUSR1.
+    pthread_t GetEmuPthread() const {
+        return emu_pthread.load();
+    }
+
 private:
     bool exec_step = false;
     bool running = false;
     std::atomic<bool> stop_run{false};
+    std::atomic<pthread_t> emu_pthread{0}; // gvx64: set in run(), used by Emergency SW Fallback
     std::mutex running_mutex;
     std::condition_variable running_cv;
 

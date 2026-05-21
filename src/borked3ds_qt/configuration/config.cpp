@@ -63,7 +63,7 @@ const std::array<std::array<int, 9>, Settings::NativeAnalog::NumAnalogs> Config:
 // This must be in alphabetical order according to action name as it must have the same order as
 // UISetting::values.shortcuts, which is alphabetically ordered.
 // clang-format off
-const std::array<UISettings::Shortcut, 38> Config::default_hotkeys {{
+const std::array<UISettings::Shortcut, 39> Config::default_hotkeys {{
      {QStringLiteral("Advance Frame"),            QStringLiteral("Main Window"), {QStringLiteral(""),       Qt::ApplicationShortcut}},
      {QStringLiteral("Audio Mute/Unmute"),        QStringLiteral("Main Window"), {QStringLiteral("Ctrl+M"), Qt::WindowShortcut}},
      {QStringLiteral("Audio Volume Down"),        QStringLiteral("Main Window"), {QStringLiteral(""),       Qt::WindowShortcut}},
@@ -72,6 +72,7 @@ const std::array<UISettings::Shortcut, 38> Config::default_hotkeys {{
      {QStringLiteral("Continue/Pause Emulation"), QStringLiteral("Main Window"), {QStringLiteral("F4"),     Qt::WindowShortcut}},
      {QStringLiteral("Decrease 3D Factor"),       QStringLiteral("Main Window"), {QStringLiteral("Ctrl+-"), Qt::ApplicationShortcut}},
      {QStringLiteral("Decrease Speed Limit"),     QStringLiteral("Main Window"), {QStringLiteral("-"),      Qt::ApplicationShortcut}},
+     {QStringLiteral("Emergency SW Fallback"),    QStringLiteral("Main Window"), {QStringLiteral(""),       Qt::ApplicationShortcut}},
      {QStringLiteral("Exit Borked3DS"),               QStringLiteral("Main Window"), {QStringLiteral("Ctrl+Q"), Qt::WindowShortcut}},
      {QStringLiteral("Exit Fullscreen"),          QStringLiteral("Main Window"), {QStringLiteral("Esc"),    Qt::WindowShortcut}},
      {QStringLiteral("Fullscreen"),               QStringLiteral("Main Window"), {QStringLiteral("F11"),    Qt::WindowShortcut}},
@@ -704,6 +705,8 @@ void Config::ReadRendererValues() {
     ReadGlobalSetting(Settings::values.use_hw_shader);
     ReadGlobalSetting(Settings::values.shaders_accurate_mul);
     ReadGlobalSetting(Settings::values.use_disk_shader_cache);
+    ReadGlobalSetting(Settings::values.auto_shader_save);  // gvx64
+    ReadBasicSetting(Settings::values.auto_shader_save_interval);  // gvx64
     ReadGlobalSetting(Settings::values.use_vsync_new);
     ReadGlobalSetting(Settings::values.resolution_factor);
     ReadGlobalSetting(Settings::values.frame_limit);
@@ -1256,6 +1259,9 @@ void Config::SaveRendererValues() {
     WriteGlobalSetting(Settings::values.use_hw_shader);
     WriteGlobalSetting(Settings::values.shaders_accurate_mul);
     WriteGlobalSetting(Settings::values.use_disk_shader_cache);
+    WriteGlobalSetting(Settings::values.auto_shader_save);  // gvx64
+    WriteSetting(QStringLiteral("auto_shader_save_interval"),
+                 Settings::values.auto_shader_save_interval.GetValue(), 60u);  // gvx64
     WriteGlobalSetting(Settings::values.use_vsync_new);
     WriteGlobalSetting(Settings::values.resolution_factor);
     WriteGlobalSetting(Settings::values.frame_limit);

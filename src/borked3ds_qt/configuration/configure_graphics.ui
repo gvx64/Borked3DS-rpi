@@ -523,6 +523,42 @@
          </widget>
         </item>
         <item row="2" column="0">
+         <widget class="QCheckBox" name="toggle_auto_shader_save">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Before each new shader compilation, automatically save game state to RAM. If a fatal GPU hang occurs, press the Emergency SW Fallback hotkey to restore this state and continue in software rendering mode. Recommended for Zelda/Pokemon on Pi4.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string>Emergency Auto-Save Before Shader Compile (Pi4)</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QLabel" name="label_auto_shader_save_interval">
+          <property name="text">
+           <string>Min Interval (sec):</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="2">
+         <widget class="QSpinBox" name="auto_shader_save_interval">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Minimum seconds between automatic RAM savestates before shader compilation. Higher values reduce overhead; lower values keep saves more frequent.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="minimum">
+           <number>10</number>
+          </property>
+          <property name="maximum">
+           <number>600</number>
+          </property>
+          <property name="singleStep">
+           <number>10</number>
+          </property>
+          <property name="value">
+           <number>60</number>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="0">
          <widget class="QCheckBox" name="toggle_vsync_new">
           <property name="toolTip">
            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;VSync prevents the screen from tearing, but some graphics cards have lower performance with VSync enabled. Keep it enabled if you don't notice a performance difference.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>

@@ -242,6 +242,7 @@ void RestoreGlobalState(bool is_powered_on) {
     values.upscaling_hack.SetGlobal(true);
     values.use_hw_shader.SetGlobal(true);
     values.use_disk_shader_cache.SetGlobal(true);
+    values.auto_shader_save.SetGlobal(true);  // gvx64
     values.shaders_accurate_mul.SetGlobal(true);
     values.use_vsync_new.SetGlobal(true);
     values.resolution_factor.SetGlobal(true);

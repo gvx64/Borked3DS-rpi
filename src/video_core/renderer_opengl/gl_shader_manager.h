@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include "video_core/rasterizer_interface.h"
 
@@ -53,6 +54,10 @@ public:
     void UseFragmentShader(const Pica::RegsInternal& config, const Pica::Shader::UserConfig& user);
 
     void ApplyTo(OpenGLState& state, bool accurate_mul);
+    // gvx64: callback fired before every new glLinkProgram call.
+    // Used by Emergency SW Fallback to capture a RAM savestate just before
+    // a shader compilation that might hang VideoCore VI.
+    void SetPreCompileCallback(std::function<void()> callback);
 
 private:
     Frontend::EmuWindow& emu_window;

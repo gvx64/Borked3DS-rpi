@@ -61,6 +61,7 @@ static GMainWindow* GetMainWindow() {
 }
 
 void EmuThread::run() {
+    emu_pthread.store(pthread_self()); // gvx64: store for Emergency SW Fallback SIGUSR1
     const auto scope = core_context.Acquire();
 
     if (Settings::values.preload_textures) {

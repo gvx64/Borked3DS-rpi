@@ -536,6 +536,8 @@ struct Values {
     SwitchableSetting<bool> async_presentation{true, "async_presentation"};
     SwitchableSetting<bool> use_hw_shader{true, "use_hw_shader"};
     SwitchableSetting<bool> use_disk_shader_cache{true, "use_disk_shader_cache"};
+    SwitchableSetting<bool> auto_shader_save{false, "auto_shader_save"};            // gvx64: Pi4 emergency RAM save-state
+    Setting<u32, true> auto_shader_save_interval{60, 10, 600, "auto_shader_save_interval"}; // gvx64: min seconds between auto saves
     Setting<u32> startup_shader_load_limit{1000, "startup_shader_load_limit"};  //gvx64
     SwitchableSetting<bool> shaders_accurate_mul{false, "shaders_accurate_mul"};
     SwitchableSetting<bool> use_vsync_new{true, "use_vsync_new"};

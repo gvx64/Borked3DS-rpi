@@ -83,6 +83,18 @@ RendererOpenGL::RendererOpenGL(Core::System& system, Pica::PicaCore& pica_,
     : VideoCore::RendererBase{system, window, secondary_window}, pica{pica_},
       rasterizer{system.Memory(), pica, system.CustomTexManager(), *this, driver},
       frame_dumper{system, window} {
+    // gvx64: install Emergency SW Fallback pre-compile callback.
+    // Fires on the emu thread just before each new glLinkProgram call.
+    // Saves uncompressed system state to RAM when auto_shader_save is enabled
+    // and the minimum interval has elapsed. No-op if setting is disabled.
+    rasterizer.SetPreCompileCallback([this]() {
+        if (!Settings::values.auto_shader_save.GetValue())
+            return;
+        if (!this->system.IsPoweredOn())
+            return;
+        this->system.SaveStateToRAM();
+    });
+
     GLint major, minor;
     glGetIntegerv(GL_MAJOR_VERSION, &major);
     glGetIntegerv(GL_MINOR_VERSION, &minor);

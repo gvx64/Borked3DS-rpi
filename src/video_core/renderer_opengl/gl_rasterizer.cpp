@@ -503,7 +503,20 @@ bool RasterizerOpenGL::SetupGeometryShader() {
     return true;
 }
 
+// gvx64: forward callback to shader manager
+void RasterizerOpenGL::SetPreCompileCallback(std::function<void()> callback) {
+    shader_manager.SetPreCompileCallback(std::move(callback));
+}
+
 bool RasterizerOpenGL::AccelerateDrawBatch(bool is_indexed) {
+    // gvx64: Emergency SW fallback guard. If use_hw_shader is false (set by
+    // Emergency SW Fallback hotkey or after RAM savestate load), immediately
+    // return false so pica_core falls through to the SW rasterizer.
+    // This is belt-and-suspenders: pica_core.cpp already checks use_hw_shader,
+    // but this guard catches any edge cases where that check is bypassed.
+    if (!Settings::values.use_hw_shader.GetValue()) {
+        return false;
+    }
     if (regs.pipeline.use_gs != Pica::PipelineRegs::UseGS::No) {
         if (regs.pipeline.gs_config.mode != Pica::PipelineRegs::GSMode::Point) {
             return false;

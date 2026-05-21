@@ -194,6 +194,9 @@ void ConfigureGraphics::SetConfiguration() {
     ui->toggle_accurate_mul->setChecked(Settings::values.shaders_accurate_mul.GetValue());
     ui->toggle_disk_shader_cache->setChecked(Settings::values.use_disk_shader_cache.GetValue());
     ui->shader_preload_limit->setValue(Settings::values.startup_shader_load_limit.GetValue());  //gvx64
+    ui->toggle_auto_shader_save->setChecked(Settings::values.auto_shader_save.GetValue());  // gvx64
+    ui->auto_shader_save_interval->setValue(
+        static_cast<int>(Settings::values.auto_shader_save_interval.GetValue()));  // gvx64
     ui->toggle_vsync_new->setChecked(Settings::values.use_vsync_new.GetValue());
     ui->spirv_shader_gen->setChecked(Settings::values.spirv_shader_gen.GetValue());
     ui->toggle_geometry_shader->setChecked(Settings::values.geometry_shader.GetValue());
@@ -264,6 +267,11 @@ void ConfigureGraphics::ApplyConfiguration() {
     ConfigurationShared::ApplyPerGameSetting(&Settings::values.use_disk_shader_cache,
                                              ui->toggle_disk_shader_cache, use_disk_shader_cache);
     Settings::values.startup_shader_load_limit = ui->shader_preload_limit->value();  //gvx64
+    ConfigurationShared::ApplyPerGameSetting(&Settings::values.auto_shader_save,
+                                             ui->toggle_auto_shader_save,
+                                             auto_shader_save);  // gvx64
+    Settings::values.auto_shader_save_interval.SetValue(
+        static_cast<u32>(ui->auto_shader_save_interval->value()));  // gvx64
     ConfigurationShared::ApplyPerGameSetting(&Settings::values.use_vsync_new, ui->toggle_vsync_new,
                                              use_vsync_new);
     ConfigurationShared::ApplyPerGameSetting(
@@ -331,6 +339,9 @@ void ConfigureGraphics::SetupPerGameUI() {
     ConfigurationShared::SetColoredTristate(ui->toggle_disk_shader_cache,
                                             Settings::values.use_disk_shader_cache,
                                             use_disk_shader_cache);
+    ConfigurationShared::SetColoredTristate(ui->toggle_auto_shader_save,
+                                            Settings::values.auto_shader_save,
+                                            auto_shader_save);  // gvx64
     ConfigurationShared::SetColoredTristate(ui->toggle_vsync_new, Settings::values.use_vsync_new,
                                             use_vsync_new);
     ConfigurationShared::SetColoredTristate(ui->toggle_async_shaders,

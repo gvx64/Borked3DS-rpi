@@ -106,6 +106,8 @@
 #include "ui_main.h"
 #include "video_core/gpu.h"
 #include "video_core/renderer_base.h"
+#include "video_core/renderer_opengl/gl_vars.h"
+#include <pthread.h>  // gvx64: pthread_kill for Emergency SW Fallback
 #include "input_common/main.h" // gvx64 - for gamepad polling
 
 #ifdef __APPLE__
@@ -168,6 +170,18 @@ GMainWindow::GMainWindow(Core::System& system_)
       emu_thread{nullptr} {
     Common::Log::Initialize();
     Common::Log::Start();
+    // gvx64: Register no-op SIGUSR1 handler without SA_RESTART.
+    // This allows pthread_kill(emu_thread, SIGUSR1) to interrupt the
+    // blocking glLinkProgram ioctl during a VideoCore VI GPU hang.
+    // Without SA_RESTART the interrupted syscall returns EINTR immediately
+    // instead of being transparently restarted by the kernel.
+    {
+        struct sigaction sa{};
+        sa.sa_handler = [](int) {};
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = 0; // no SA_RESTART — deliberate
+        sigaction(SIGUSR1, &sa, nullptr);
+    }
 
     Debugger::ToggleConsole();
 
@@ -732,6 +746,32 @@ void GMainWindow::InitializeHotkeys() {
     };
 
     connect_shortcut(QStringLiteral("Toggle Screen Layout"), &GMainWindow::ToggleScreenLayout);
+    // gvx64: Emergency SW fallback hotkey.
+    // When VideoCore VI fatal GPU hang occurs (FPS=0, game speed still running,
+    // cursor moves freely, screens frozen), press this hotkey to:
+    //   1. SendSignal(LoadFromRAM) — loaded in-place, GL context preserved
+    //   2. Signal handler forces use_hw_shader=false + g_emergency_sw_active
+    // This mirrors the file-based OnLoadState path exactly, which is known to
+    // work during a live hang because the emu thread keeps running RunLoop()
+    // iterations even while an emulated 3DS thread is stuck waiting on a GSP
+    // interrupt event. No GL context teardown needed or wanted.
+    // Requires "Emergency Auto-Save Before Shader Compile" enabled in Graphics
+    // settings for the game. Without a RAM savestate the hotkey is a no-op.
+    connect_shortcut(QStringLiteral("Emergency SW Fallback"), [&] {
+        if (!emulation_running)
+            return;
+        if (!system.HasRAMState()) {
+            LOG_WARNING(Frontend,
+                "gvx64: Emergency SW fallback triggered but no RAM savestate available. "
+                "Enable 'Emergency Auto-Save Before Shader Compile' in Graphics settings.");
+            return;
+        }
+        LOG_WARNING(Frontend,
+            "gvx64: Emergency SW fallback triggered. "
+            "Loading RAM savestate in-place (GL context preserved).");
+        system.SendSignal(Core::System::Signal::LoadFromRAM);
+        system.frame_limiter.AdvanceFrame();
+    });
 
     connect_shortcut(QStringLiteral("Exit Fullscreen"), [&] {
         if (emulation_running) {
@@ -1701,8 +1741,8 @@ void GMainWindow::BootGame(const QString& filename) {
 
     loading_screen->Prepare(system.GetAppLoader());
     loading_screen->show();
-
     emulation_running = true;
+
     if (ui->action_Fullscreen->isChecked()) {
         ShowFullscreen();
     }
@@ -1874,6 +1914,9 @@ void GMainWindow::UpdateSaveStates() {
         }
     }
     for (const auto& savestate : savestates) {
+        // gvx64: slot 11 is the emergency savestate slot, outside the UI array bounds.
+        if (savestate.slot >= Core::SaveStateSlotCount)
+            continue;
         const bool display_name =
             savestate.status == Core::SaveStateInfo::ValidationStatus::RevisionDismatch &&
             !savestate.build_name.empty();

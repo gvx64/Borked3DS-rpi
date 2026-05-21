@@ -372,6 +372,9 @@ private:
 
     // Whether emulation is currently running in Borked3DS.
     bool emulation_running = false;
+    // gvx64: slot 11 is outside the UI menu (which uses slots 0-10) so it won't
+    // clobber user savestates. It is still valid in GetSaveStatePath().
+    static constexpr u32 EMERGENCY_SAVESTATE_SLOT = 11;
     std::unique_ptr<EmuThread> emu_thread;
     // The title of the game currently running
     QString game_title;

@@ -262,7 +262,17 @@ GLuint LoadProgram(bool separable_program, std::span<const GLuint> shaders) {
         }
     }
 
-    ASSERT_MSG(result == GL_TRUE, "Shader not linked");
+    // gvx64: Do not assert on link failure — glLinkProgram may return GL_FALSE
+    // if interrupted by SIGUSR1 during an Emergency SW Fallback (VideoCore VI
+    // GPU hang recovery). Returning 0 here causes the shader manager to fall
+    // through gracefully; use_hw_shader=false ensures no further HW draws occur.
+    if (result != GL_TRUE) {
+        LOG_ERROR(Render_OpenGL,
+            "gvx64: glLinkProgram failed (result={}), returning 0 — "
+            "likely interrupted by Emergency SW Fallback SIGUSR1.", result);
+        glDeleteProgram(program_id);
+        return 0;
+    }
 
     for (GLuint shader : shaders) {
         if (shader != 0) {

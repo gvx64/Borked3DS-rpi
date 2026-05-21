@@ -7,8 +7,10 @@
 
 #include <atomic>
 #include <memory>
+#include <chrono>
 #include <mutex>
 #include <string>
+#include <vector>
 #include <boost/optional.hpp>
 #include <boost/serialization/version.hpp>
 #include "common/common_types.h"
@@ -132,7 +134,7 @@ public:
     /// Shutdown and then load again
     void Reset();
 
-    enum class Signal : u32 { None, Shutdown, Reset, Save, Load };
+    enum class Signal : u32 { None, Shutdown, Reset, Save, Load, LoadFromRAM };
 
     bool SendSignal(Signal signal, u32 param = 0);
 
@@ -350,6 +352,11 @@ public:
 
     void LoadState(u32 slot);
 
+    void SaveStateToRAM();   // gvx64: save to RAM buffer (no disk I/O, no compression)
+    void LoadStateFromRAM(); // gvx64: restore from RAM buffer
+    bool HasRAMState() const { return !ram_state_buffer.empty(); } // gvx64
+    bool HasRAMStateOld() const { return !ram_state_buffer_old.empty(); } // gvx64
+
     /// Self delete ncch
     bool SetSelfDelete(const std::string& file) {
         if (m_filepath == file) {
@@ -455,6 +462,10 @@ private:
     std::mutex signal_mutex;
     Signal current_signal;
     u32 signal_param;
+
+    std::vector<u8> ram_state_buffer;                         // gvx64: emergency RAM savestate (recent)
+    std::vector<u8> ram_state_buffer_old;                     // gvx64: emergency RAM savestate (older, loaded on hotkey)
+    std::chrono::steady_clock::time_point last_ram_save_time; // gvx64: interval limiting
 
     std::function<bool()> mic_permission_func;
     bool mic_permission_granted = false;

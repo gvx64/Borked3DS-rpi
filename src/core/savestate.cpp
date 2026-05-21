@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <sstream>
+#include "common/settings.h"  // gvx64: for auto_shader_save_interval
 #include <cryptopp/hex.h>
 #include <fmt/ranges.h>
 #include "common/archives.h"
@@ -216,6 +217,73 @@ void System::LoadState(u32 slot) {
     // Deserialize
     iarchive ia{sstream};
     ia&* this;
+}
+
+// gvx64: Save system state to RAM buffer. No ZSTD compression for speed.
+// Fires on the emu thread just before glLinkProgram. Interval enforced here.
+void System::SaveStateToRAM() {
+    if (app_loader) {
+        if (!app_loader->SupportsSaveStates()) {
+            LOG_WARNING(Core,
+                "gvx64: SaveStateToRAM skipped: app loader does not support savestates");
+            return;
+        }
+    }
+    const auto now = std::chrono::steady_clock::now();
+    const auto interval = std::chrono::seconds(
+        Settings::values.auto_shader_save_interval.GetValue());
+    if (!ram_state_buffer.empty() && now - last_ram_save_time < interval) {
+        return; // Too soon since last save
+    }
+    try {
+        const auto t0 = std::chrono::steady_clock::now();
+        std::ostringstream sstream{std::ios_base::binary};
+        oarchive oa{sstream};
+        oa&* this;
+        const auto t1 = std::chrono::steady_clock::now();
+        const std::string& str{sstream.str()};
+        // gvx64: Rotate — move recent buffer to old slot before overwriting.
+        // Hotkey always loads from old slot (guaranteed >= min_interval older).
+        if (!ram_state_buffer.empty()) {
+            ram_state_buffer_old = std::move(ram_state_buffer);
+        }
+        ram_state_buffer.assign(
+            reinterpret_cast<const u8*>(str.data()),
+            reinterpret_cast<const u8*>(str.data()) + str.size());
+        last_ram_save_time = now;
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+        LOG_INFO(Core,
+            "gvx64: Emergency RAM savestate saved ({} bytes, serialization took {}ms). "
+            "Old slot: {} bytes.",
+            ram_state_buffer.size(), ms, ram_state_buffer_old.size());
+    } catch (const std::exception& e) {
+        LOG_ERROR(Core, "gvx64: SaveStateToRAM failed: {}", e.what());
+        ram_state_buffer.clear();
+    }
+}
+
+// gvx64: Restore from in-memory buffer written by SaveStateToRAM.
+void System::LoadStateFromRAM() {
+    // gvx64: Prefer the old buffer — it is guaranteed to be at least
+    // min_interval seconds older than the hang point, reducing the chance
+    // of loading a state that immediately re-triggers the fatal hang.
+    // Fall back to the recent buffer only if no old buffer exists yet
+    // (i.e. early in the session before the second save has fired).
+    const std::vector<u8>& buf =
+        !ram_state_buffer_old.empty() ? ram_state_buffer_old : ram_state_buffer;
+    if (buf.empty()) {
+        throw std::runtime_error("gvx64: No RAM savestate available");
+    }
+    const bool using_old = !ram_state_buffer_old.empty();
+    std::istringstream sstream{
+        std::string{reinterpret_cast<char*>(const_cast<u8*>(buf.data())),
+                    buf.size()},
+        std::ios_base::binary};
+    iarchive ia{sstream};
+    ia&* this;
+    LOG_INFO(Core,
+        "gvx64: Emergency RAM savestate loaded successfully ({})",
+        using_old ? "old slot" : "recent slot — old not yet available");
 }
 
 } // namespace Core
