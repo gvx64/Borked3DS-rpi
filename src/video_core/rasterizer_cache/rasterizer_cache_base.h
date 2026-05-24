@@ -227,6 +227,7 @@ private:
     PageMap cached_pages;
     u32 resolution_scale_factor;
     u64 frame_tick{};
+    u64 sweep_tick{};  ///< gvx64: frame_tick when idle sweep last ran
     FramebufferParams fb_params;
     Settings::TextureFilter filter;
     bool dump_textures;

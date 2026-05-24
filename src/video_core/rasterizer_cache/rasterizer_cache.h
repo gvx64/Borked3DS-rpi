@@ -123,6 +123,46 @@ void RasterizerCache<T>::RunGarbageCollector() {
         slot_surfaces.erase(surface_id);
         it = sentenced.erase(it);
     }
+
+    // gvx64 idle eviction ─────────────────────────────────────────────
+    // Proactively sentence surfaces that have not been accessed in
+    // IDLE_EVICT_THRESHOLD frames.  Surfaces are recreated from FCRAM on
+    // next access, so eviction is always safe — worst case is a one-frame
+    // reload stutter for a texture the game revisits after a long gap.
+    // The sweep is fully gated: it does not run on small caches or more
+    // than once per SWEEP_INTERVAL frames, so steady-state overhead is nil.
+    static constexpr u64         IDLE_EVICT_THRESHOLD = 3600; // ~60 s @ 60 fps
+    static constexpr u64         SWEEP_INTERVAL       = 300;  // ~5 s  @ 60 fps
+    static constexpr std::size_t MIN_SURFACES         = 256;  // skip small caches
+    if (slot_surfaces.size() > MIN_SURFACES &&
+        frame_tick - sweep_tick >= SWEEP_INTERVAL) { //gvx64
+        sweep_tick = frame_tick; //gvx64
+        // Collect idle surface IDs by walking page_table.
+        // Surfaces span multiple pages so an ID may appear more than once;
+        // duplicates are handled cheaply by re-checking Registered below.
+        std::vector<SurfaceId> idle_ids; //gvx64
+        for (const auto& [page, page_surfaces] : page_table) { //gvx64
+            for (const SurfaceId id : page_surfaces) { //gvx64
+                const Surface& s = slot_surfaces[id]; //gvx64
+                if (True(s.flags & SurfaceFlagBits::Registered) && //gvx64
+                    s.addr != 0 && s.size != 0 &&                  //gvx64: skip null surfaces
+                    s.type != SurfaceType::Fill &&                  //gvx64: skip Fill surfaces
+                    s.last_used_frame > 0 &&                        //gvx64: skip never-stamped surfaces
+                    frame_tick - s.last_used_frame > IDLE_EVICT_THRESHOLD && //gvx64
+                    !std::any_of(dirty_regions.begin(), dirty_regions.end(), //gvx64: skip dirty render targets
+                        [id](const auto& e) { return e.second == id; })) { //gvx64
+                    idle_ids.push_back(id); //gvx64
+                } //gvx64
+            } //gvx64
+        } //gvx64
+        for (const SurfaceId id : idle_ids) { //gvx64
+            // Re-check: a prior UnregisterSurface call in this loop may
+            // have already cleared Registered for a duplicate id entry.
+            if (True(slot_surfaces[id].flags & SurfaceFlagBits::Registered)) { //gvx64
+                UnregisterSurface(id); //gvx64
+            } //gvx64
+        } //gvx64
+    } // end idle eviction sweep //gvx64
 }
 
 template <class T>
@@ -454,7 +494,9 @@ bool RasterizerCache<T>::AccelerateFill(const Pica::MemoryFillConfig& config) {
 
 template <class T>
 typename T::Surface& RasterizerCache<T>::GetSurface(SurfaceId surface_id) {
-    return slot_surfaces[surface_id];
+    auto& surface = slot_surfaces[surface_id];        //gvx64
+    surface.last_used_frame = frame_tick;             //gvx64: stamp for idle eviction
+    return surface;                                   //gvx64
 }
 
 template <class T>

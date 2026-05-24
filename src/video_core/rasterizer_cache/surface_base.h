@@ -86,6 +86,7 @@ private:
 
 public:
     SurfaceFlagBits flags{};
+    u64 last_used_frame{0}; ///< gvx64: frame_tick of last GetSurface access (idle eviction)
     const Material* material = nullptr;
     SurfaceRegions invalid_regions;
     u32 fill_size = 0;
