@@ -1076,6 +1076,21 @@ void GMainWindow::TriggerHotkeyAction(const QString& group, const QString& actio
     } else if (action == QStringLiteral("Quick Load")) {
         // Trigger the QAction directly - gvx64
         ui->action_Quick_Load->trigger();
+    } else if (action == QStringLiteral("Emergency SW Fallback")) {
+        // gvx64: Mirror the keyboard shortcut handler exactly
+        if (!emulation_running)
+            return;
+        if (!system.HasRAMState()) {
+            LOG_WARNING(Frontend,
+                "gvx64: Emergency SW fallback triggered but no RAM savestate available. "
+                "Enable 'Emergency Auto-Save Before Shader Compile' in Graphics settings.");
+            return;
+        }
+        LOG_WARNING(Frontend,
+            "gvx64: Emergency SW fallback triggered (gamepad). "
+            "Loading RAM savestate in-place (GL context preserved).");
+        system.SendSignal(Core::System::Signal::LoadFromRAM);
+        system.frame_limiter.AdvanceFrame();
     }
     // Add more hotkey mappings as needed
 }
