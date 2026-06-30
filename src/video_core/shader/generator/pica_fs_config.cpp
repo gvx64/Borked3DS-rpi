@@ -4,6 +4,9 @@
 // Refer to the license.txt file included.
 
 #include "video_core/shader/generator/pica_fs_config.h"
+#include "common/settings.h"
+#include "video_core/renderer_opengl/gl_vars.h"
+#include "video_core/renderer_opengl/gl_shader_disk_cache.h"
 
 namespace Pica::Shader {
 
@@ -81,8 +84,35 @@ LightConfig::LightConfig(const Pica::LightingRegs& regs) {
         return;
     }
 
+    // gvx64: MaxPerformance normalizes lighting structure for GLES/Pi4.
+    // Keeps lighting.enable=1 (ambient+diffuse base shading intact — avoids
+    // black/unlit models) but forces the *structural* sub-fields that drive
+    // per-draw GLSL codegen variation (src_num/light-loop bound, per-light
+    // atten/shadow/geometric-factor enables, specular/fresnel LUT enables)
+    // to a fixed minimal shape. This collapses the lighting-driven FSConfig
+    // permutation space that caused per-enemy/per-environment shader
+    // recompiles during lit spell effects (e.g. Fire Emblem Awakening magic
+    // attacks) and dynamic lights (e.g. Captain Toad's headlamp).
+    // Trade-off: no specular highlights, spotlight cone, distance falloff,
+    // or shadow-receiving on lit objects in MaxPerformance mode — flat
+    // ambient + single-light diffuse shading only. Does not affect
+    // Performance mode or any other mode — shader cache for those modes is
+    // unaffected.
+    // gvx64: MaxPerformance lighting normalisation is restricted to games
+    // known to benefit from it (FE engine titles with heavy per-enemy
+    // lighting permutations). Other games (e.g. Captain Toad) use dynamic
+    // lighting as a core visual/gameplay element and should not be affected.
+    // Add FE Fates EUR/USA/JPN IDs here once confirmed.
+    const u64 prog_id = OpenGL::ShaderDiskCache::GetInstance().GetProgramID();
+    constexpr u64 FE_AWAKENING = 0x00040000000A0500; // Fire Emblem: Awakening
+    const bool is_fe_engine_game = (prog_id == FE_AWAKENING);
+    const bool max_perf =
+        is_fe_engine_game &&
+        OpenGL::GLES && Settings::values.optimize_spirv_output.GetValue() ==
+                            Settings::OptimizeSpirv::MaxPerformance;
+
     enable.Assign(1);
-    src_num.Assign(regs.max_light_index + 1);
+    src_num.Assign(max_perf ? 1 : (regs.max_light_index + 1));
     config.Assign(regs.config0.config);
     enable_primary_alpha.Assign(regs.config0.enable_primary_alpha);
     enable_secondary_alpha.Assign(regs.config0.enable_secondary_alpha);
@@ -91,7 +121,7 @@ LightConfig::LightConfig(const Pica::LightingRegs& regs) {
     bump_renorm.Assign(regs.config0.disable_bump_renorm == 0);
     clamp_highlights.Assign(regs.config0.clamp_highlights != 0);
 
-    enable_shadow.Assign(regs.config0.enable_shadow != 0);
+    enable_shadow.Assign(max_perf ? 0 : (regs.config0.enable_shadow != 0));
     if (enable_shadow) {
         shadow_primary.Assign(regs.config0.shadow_primary != 0);
         shadow_secondary.Assign(regs.config0.shadow_secondary != 0);
@@ -100,27 +130,32 @@ LightConfig::LightConfig(const Pica::LightingRegs& regs) {
         shadow_selector.Assign(regs.config0.shadow_selector);
     }
 
-    for (u32 light_index = 0; light_index <= regs.max_light_index; ++light_index) {
+    // gvx64: clamp the population loop bound itself under MaxPerformance —
+    // unused-but-populated lights[1..N] entries are still memcmp'd/hashed by
+    // FSConfig::Hash() regardless of src_num, so leaving the loop unbounded
+    // would still let per-enemy light variation bust the cache key.
+    const u32 max_perf_light_index = max_perf ? 0 : regs.max_light_index.Value();
+    for (u32 light_index = 0; light_index <= max_perf_light_index; ++light_index) {
         const u32 num = regs.light_enable.GetNum(light_index);
         const auto& light = regs.light[num];
         lights[light_index].num.Assign(num);
         lights[light_index].directional.Assign(light.config.directional != 0);
         lights[light_index].two_sided_diffuse.Assign(light.config.two_sided_diffuse != 0);
-        lights[light_index].geometric_factor_0.Assign(light.config.geometric_factor_0 != 0);
-        lights[light_index].geometric_factor_1.Assign(light.config.geometric_factor_1 != 0);
-        lights[light_index].dist_atten_enable.Assign(!regs.IsDistAttenDisabled(num));
-        lights[light_index].spot_atten_enable.Assign(!regs.IsSpotAttenDisabled(num));
-        lights[light_index].shadow_enable.Assign(!regs.IsShadowDisabled(num));
+        lights[light_index].geometric_factor_0.Assign(max_perf ? 0 : (light.config.geometric_factor_0 != 0));
+        lights[light_index].geometric_factor_1.Assign(max_perf ? 0 : (light.config.geometric_factor_1 != 0));
+        lights[light_index].dist_atten_enable.Assign(max_perf ? 0 : !regs.IsDistAttenDisabled(num));
+        lights[light_index].spot_atten_enable.Assign(max_perf ? 0 : !regs.IsSpotAttenDisabled(num));
+        lights[light_index].shadow_enable.Assign(max_perf ? 0 : !regs.IsShadowDisabled(num));
     }
 
-    lut_d0.enable.Assign(regs.config1.disable_lut_d0 == 0);
+    lut_d0.enable.Assign(regs.config1.disable_lut_d0 == 0); // gvx64: lut_d0 re-enabled under MaxPerformance — global scene reg, not per-enemy; restores smooth specular highlight shape (sword glow etc)
     if (lut_d0.enable) {
         lut_d0.abs_input.Assign(regs.abs_lut_input.disable_d0 == 0);
         lut_d0.type.Assign(regs.lut_input.d0.Value());
         lut_d0.scale = regs.lut_scale.GetScale(regs.lut_scale.d0);
     }
 
-    lut_d1.enable.Assign(regs.config1.disable_lut_d1 == 0);
+    lut_d1.enable.Assign(max_perf ? 0 : (regs.config1.disable_lut_d1 == 0));
     if (lut_d1.enable) {
         lut_d1.abs_input.Assign(regs.abs_lut_input.disable_d1 == 0);
         lut_d1.type.Assign(regs.lut_input.d1.Value());
@@ -133,7 +168,7 @@ LightConfig::LightConfig(const Pica::LightingRegs& regs) {
     lut_sp.type.Assign(regs.lut_input.sp.Value());
     lut_sp.scale = regs.lut_scale.GetScale(regs.lut_scale.sp);
 
-    lut_fr.enable.Assign(regs.config1.disable_lut_fr == 0);
+    lut_fr.enable.Assign(max_perf ? 0 : (regs.config1.disable_lut_fr == 0));
     if (lut_fr.enable) {
         lut_fr.abs_input.Assign(regs.abs_lut_input.disable_fr == 0);
         lut_fr.type.Assign(regs.lut_input.fr.Value());
