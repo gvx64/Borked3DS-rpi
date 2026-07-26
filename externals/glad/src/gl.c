@@ -88,6 +88,7 @@ int GLAD_GL_OES_texture_view = 0;
 int GLAD_GL_OES_vertex_array_object = 0;
 int GLAD_GL_OES_texture_buffer = 0; //gvx64
 int GLAD_GL_OES_shader_image_atomic = 0; //gvx64
+int GLAD_GL_EXT_copy_image = 0; //gvx64: for glCopyImageSubData on GLES via GL_EXT/OES_copy_image
 
 PFNGLACTIVEPROGRAMEXTPROC glad_glActiveProgramEXT = NULL;
 PFNGLACTIVESHADERPROGRAMPROC glad_glActiveShaderProgram = NULL;
@@ -1918,6 +1919,19 @@ static void glad_gl_load_GL_OES_texture_buffer( GLADuserptrloadfunc load, void* 
     glad_glTexBufferRangeOES = (PFNGLTEXBUFFERRANGEOESPROC) load(userptr, "glTexBufferRangeOES"); //gvx64
 } //gvx64
 
+static void glad_gl_load_GL_EXT_copy_image( GLADuserptrloadfunc load, void* userptr) { //gvx64
+    if(!GLAD_GL_EXT_copy_image) return; //gvx64
+    // VideoCore VI exposes glCopyImageSubData via GL_EXT_copy_image and GL_OES_copy_image //gvx64
+    // on GLES 3.1 but GLAD's GLES loader never resolved it, leaving the pointer NULL. //gvx64
+    // Try the EXT suffix first, then OES, then the unsuffixed core GL 4.3 name. //gvx64
+    if (!glad_glCopyImageSubData) //gvx64
+        glad_glCopyImageSubData = (PFNGLCOPYIMAGESUBDATAPROC) load(userptr, "glCopyImageSubDataEXT"); //gvx64
+    if (!glad_glCopyImageSubData) //gvx64
+        glad_glCopyImageSubData = (PFNGLCOPYIMAGESUBDATAPROC) load(userptr, "glCopyImageSubDataOES"); //gvx64
+    if (!glad_glCopyImageSubData) //gvx64
+        glad_glCopyImageSubData = (PFNGLCOPYIMAGESUBDATAPROC) load(userptr, "glCopyImageSubData"); //gvx64
+} //gvx64
+
 
 static void glad_gl_free_extensions(char **exts_i) {
     if (exts_i != NULL) {
@@ -2168,6 +2182,8 @@ static int glad_gl_find_extensions_gles2(void) {
     GLAD_GL_OES_texture_view = glad_gl_has_extension(exts, exts_i, "GL_OES_texture_view");
     GLAD_GL_OES_vertex_array_object = glad_gl_has_extension(exts, exts_i, "GL_OES_vertex_array_object");
     GLAD_GL_OES_texture_buffer = glad_gl_has_extension(exts, exts_i, "GL_OES_texture_buffer"); //gvx64
+    GLAD_GL_EXT_copy_image = glad_gl_has_extension(exts, exts_i, "GL_EXT_copy_image") || //gvx64
+                             glad_gl_has_extension(exts, exts_i, "GL_OES_copy_image"); //gvx64
 
     glad_gl_free_extensions(exts_i);
 
@@ -2233,6 +2249,7 @@ int gladLoadGLES2UserPtr( GLADuserptrloadfunc load, void *userptr) {
     glad_gl_load_GL_OES_texture_view(load, userptr);
     glad_gl_load_GL_OES_vertex_array_object(load, userptr);
     glad_gl_load_GL_OES_texture_buffer(load, userptr); //gvx64
+    glad_gl_load_GL_EXT_copy_image(load, userptr); //gvx64: resolve glCopyImageSubData on GLES
 
 
     return version;

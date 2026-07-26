@@ -162,9 +162,11 @@ public:
     OpenGLState();
 
     /// Get the currently active OpenGL state
-    static OpenGLState GetCurState() {
-        return cur_state;
-    }
+    static OpenGLState& GetCurState() { //gvx64: return by reference so Reset*/Apply() modify
+        return cur_state;               //gvx64: actual cur_state, not a temporary copy.
+    }                                   //gvx64: Previously returned by value, causing FBO
+                                        //gvx64: binding desync (bound_fbo=0, 0x502) in
+                                        //gvx64: FE Fates/Awakening/Yokai Watch/DB Fusions.
 
     bool EmulateColorBlend() const {
         return blend.rgb_equation == GL_MIN || blend.rgb_equation == GL_MAX;
