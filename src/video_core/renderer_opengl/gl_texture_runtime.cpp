@@ -331,31 +331,27 @@ void TextureRuntime::ClearTexture(Surface& surface, const VideoCore::TextureClea
 
 bool TextureRuntime::CopyTextures(Surface& source, Surface& dest,
                                   std::span<const VideoCore::TextureCopy> copies) {
-    const GLenum src_textarget = source.texture_type == VideoCore::TextureType::CubeMap
-                                     ? GL_TEXTURE_CUBE_MAP_POSITIVE_X  // pick face as needed
-                                     : GL_TEXTURE_2D;
-    const GLenum dest_textarget = dest.texture_type == VideoCore::TextureType::CubeMap
-                                       ? GL_TEXTURE_CUBE_MAP_POSITIVE_X
-                                       : GL_TEXTURE_2D;
-
-    GLuint src_fbo = 0, dst_fbo = 0;
-    glGenFramebuffers(1, &src_fbo);
-    glGenFramebuffers(1, &dst_fbo);
+    // gvx64: Use OpenGLState-managed persistent FBOs instead of temporary FBOs bound via
+    // gvx64: raw glBindFramebuffer(). The original code called glBindFramebuffer(0) during
+    // gvx64: cleanup, desyncing OpenGLState::cur_state from the actual GL binding. The next
+    // gvx64: Attach() call (from BlitTextures or ClearTexture) then targeted FBO 0 (the
+    // gvx64: default framebuffer), causing GL_INVALID_OPERATION (0x502) and blacklisting
+    // gvx64: 0x18000000 (the main 3D colour buffer), producing the transparent silhouette
+    // gvx64: artifact in Fire Emblem Fates. Pattern mirrors BlitTextures exactly.
+    OpenGLState state = OpenGLState::GetCurState(); //gvx64
+    state.scissor.enabled = false; //gvx64
+    state.draw.read_framebuffer = read_fbos[FboIndex(source.type)].handle; //gvx64
+    state.draw.draw_framebuffer = draw_fbos[FboIndex(dest.type)].handle; //gvx64
+    state.Apply(); //gvx64
 
     for (const auto& copy : copies) {
-        // Bind source texture to src FBO
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, src_fbo);
-        glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                               src_textarget + copy.src_layer, source.Handle(), copy.src_level);
-
-        // Bind destination texture to dst FBO
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dst_fbo);
-        glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                               dest_textarget + copy.dst_layer, dest.Handle(), copy.dst_level);
-
-        // Set the read/draw buffers (required in desktop OpenGL, but not in GLES)
-        // glReadBuffer(GL_COLOR_ATTACHMENT0);
-        // glDrawBuffer(GL_COLOR_ATTACHMENT0);
+        // gvx64: Attach through blacklist-aware Attach(); scaled=false to use unscaled handle
+        if (!source.Attach(GL_READ_FRAMEBUFFER, copy.src_level, copy.src_layer, false)) { //gvx64
+            return false; //gvx64
+        } //gvx64
+        if (!dest.Attach(GL_DRAW_FRAMEBUFFER, copy.dst_level, copy.dst_layer, false)) { //gvx64
+            return false; //gvx64
+        } //gvx64
 
         // Perform the blit
         glBlitFramebuffer(copy.src_offset.x, copy.src_offset.y,
@@ -366,12 +362,6 @@ bool TextureRuntime::CopyTextures(Surface& source, Surface& dest,
                           copy.dst_offset.y + copy.extent.height,
                           GL_COLOR_BUFFER_BIT, GL_NEAREST);
     }
-
-    // Clean up
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    glDeleteFramebuffers(1, &src_fbo);
-    glDeleteFramebuffers(1, &dst_fbo);
 
     return true;
 }
