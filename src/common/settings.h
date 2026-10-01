@@ -650,7 +650,7 @@ struct Values {
     SwitchableSetting<bool> upscaling_hack{false, "upscaling_hack"};
 
     // Miscellaneous
-    Setting<std::string> log_filter{"*:Trace", "log_filter"};
+    Setting<std::string> log_filter{"*:Info", "log_filter"}; // gvx64: was *:Trace; Debug logging costs perf on Pi4
     Setting<std::string> log_regex_filter{"", "log_regex_filter"};
 
     // Video Dumping

@@ -282,7 +282,7 @@ public:
         profile = Pica::Shader::Profile{
             .has_separable_shaders = separable,
             .has_clip_planes = driver.HasClipCullDistance(),
-            .has_geometry_shader = true,
+            .has_geometry_shader = driver.HasExtension("GL_EXT_geometry_shader"), //gvx64: check actual extension support
             .has_custom_border_color =
                 !is_gles || driver.HasExtension("GL_EXT_texture_border_clamp"),
             .has_fragment_shader_interlock = driver.HasArbFragmentShaderInterlock(),
