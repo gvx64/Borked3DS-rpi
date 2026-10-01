@@ -2662,7 +2662,16 @@ void GMainWindow::OnRestartGame() {
 }
 
 void GMainWindow::OnPauseGame() {
-    system.frame_limiter.SetFrameAdvancing(true);
+    // gvx64: When the Wait Tree dock is visible, do a real EmuThread pause instead of
+    // gvx64: frame-advance parking. Frame-advance pause leaves emu_thread->IsRunning()
+    // gvx64: true, so EmuThread::run() never emits DebugModeEntered and the Wait Tree
+    // gvx64: stays blank. OnStartGame() already calls SetRunning(true) and
+    // gvx64: SetFrameAdvancing(false), so resume needs no change. Debug aid only.
+    if (waitTreeWidget && waitTreeWidget->isVisible()) { // gvx64
+        emu_thread->SetRunning(false);                     // gvx64
+    } else {                                               // gvx64
+        system.frame_limiter.SetFrameAdvancing(true);
+    }                                                      // gvx64
     qt_cameras->PauseCameras();
 
     play_time_manager->Stop();
