@@ -429,7 +429,7 @@ void DspHle::Impl::AudioTickCallback(s64 cycles_late) {
     // gvx64: of audio-pipe interrupts and desyncing the game's audio thread (symptom:
     // gvx64: Speed ~125%, Game 0 FPS, game threads blocked). Clamp time_scale and floor
     // gvx64: the reschedule delay so a stall can never produce an interrupt flood.
-    constexpr double kMaxRealtimeTimeScale = 3.0; // gvx64: covers games at >= 33% speed
+    constexpr double kMaxRealtimeTimeScale = 10.0; // gvx64: covers games at >= 10% speed; 3.0 was too tight and hung Ultra Moon on brief dips
     constexpr s64 kMinAudioTickDelay = static_cast<s64>(audio_frame_ticks / 8); // gvx64
     const double raw_time_scale =
         Settings::values.enable_realtime_audio

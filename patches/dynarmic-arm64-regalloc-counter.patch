@@ -1,0 +1,40 @@
+diff --git a/src/dynarmic/backend/arm64/reg_alloc.cpp b/src/dynarmic/backend/arm64/reg_alloc.cpp
+index 67e9ea5d..1b41b664 100644
+--- a/src/dynarmic/backend/arm64/reg_alloc.cpp
++++ b/src/dynarmic/backend/arm64/reg_alloc.cpp
+@@ -437,9 +437,10 @@ int RegAlloc::AllocateRegister(const std::array<HostLocInfo, 32>& regs, const st
+     std::vector<int> candidates;
+     std::copy_if(order.begin(), order.end(), std::back_inserter(candidates), [&](int i) { return regs[i].MaybeAllocatable(); });
+ 
+-    // TODO: LRU
+-    std::uniform_int_distribution<size_t> dis{0, candidates.size() - 1};
+-    return candidates[dis(rand_gen)];
++    // TODO: The candidate was chosen randomly before, and a LRU was
++    // suggested as an improvement. However, using an incrementing index
++    // seems to be close enough. Determine if an LRU is still needed.
++    return candidates[alloc_candidate_index++ % candidates.size()];
+ }
+ 
+ void RegAlloc::SpillGpr(int index) {
+diff --git a/src/dynarmic/backend/arm64/reg_alloc.h b/src/dynarmic/backend/arm64/reg_alloc.h
+index a9a996b6..c0a28ddc 100644
+--- a/src/dynarmic/backend/arm64/reg_alloc.h
++++ b/src/dynarmic/backend/arm64/reg_alloc.h
+@@ -159,7 +159,7 @@ public:
+     using ArgumentInfo = std::array<Argument, IR::max_arg_count>;
+ 
+     explicit RegAlloc(oaknut::CodeGenerator& code, FpsrManager& fpsr_manager, std::vector<int> gpr_order, std::vector<int> fpr_order)
+-            : code{code}, fpsr_manager{fpsr_manager}, gpr_order{gpr_order}, fpr_order{fpr_order}, rand_gen{std::random_device{}()} {}
++            : code{code}, fpsr_manager{fpsr_manager}, gpr_order{gpr_order}, fpr_order{fpr_order} {}
+ 
+     ArgumentInfo GetArgumentInfo(IR::Inst* inst);
+     bool WasValueDefined(IR::Inst* inst) const;
+@@ -334,7 +334,7 @@ private:
+     HostLocInfo flags;
+     std::array<HostLocInfo, SpillCount> spills;
+ 
+-    mutable std::mt19937 rand_gen;
++    mutable size_t alloc_candidate_index{};
+ 
+     tsl::robin_set<const IR::Inst*> defined_insts;
+ };
