@@ -160,8 +160,24 @@ void ConfigureAudio::SetVolumeIndicatorText(int percentage) {
 }
 
 void ConfigureAudio::SetHleFeaturesEnabled() {
-    const bool is_hle =
-        ui->emulation_combo_box->currentIndex() == static_cast<int>(Settings::AudioEmulation::HLE);
+    // gvx64: Resolve the effective audio-emulation mode instead of comparing the raw
+    // gvx64: combo index. In the per-game dialog SetColoredComboBox inserts a
+    // gvx64: "use global" row (+ separator) at the top, so the real HLE/LLE rows are
+    // gvx64: shifted and currentIndex() no longer equals AudioEmulation::HLE. That left
+    // gvx64: the HLE-only toggles (Audio Stretching, Realtime Audio) greyed out for every
+    // gvx64: per-game selection. Resolve mode via the setting: on "use global" fall back
+    // gvx64: to the global value; otherwise map the shifted index to the concrete mode.
+    Settings::AudioEmulation mode;
+    if (Settings::IsConfiguringGlobal()) {
+        mode = static_cast<Settings::AudioEmulation>(ui->emulation_combo_box->currentIndex());
+    } else if (ui->emulation_combo_box->currentIndex() == ConfigurationShared::USE_GLOBAL_INDEX) {
+        mode = Settings::values.audio_emulation.GetValue(true); // global value
+    } else {
+        // Per-game concrete selection: subtract the "use global" row + separator offset.
+        mode = static_cast<Settings::AudioEmulation>(
+            ui->emulation_combo_box->currentIndex() - ConfigurationShared::USE_GLOBAL_OFFSET);
+    }
+    const bool is_hle = (mode == Settings::AudioEmulation::HLE);
 
     ui->toggle_audio_stretching->setEnabled(is_hle);
     ui->toggle_realtime_audio->setEnabled(is_hle);
